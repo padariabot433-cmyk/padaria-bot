@@ -82,7 +82,7 @@ export async function handleMessage(sock, jid, rawText, pushName) {
       await reply(
         sock,
         jid,
-        `Quantas unidades de *${validItems[0].name}* você quer?`
+        `Quantos pacotes de *${validItems[0].name}* você quer?`
       );
       break;
     }
@@ -106,7 +106,7 @@ export async function handleMessage(sock, jid, rawText, pushName) {
 
       if (session.pendingIndex < session.pendingItems.length) {
         const next = session.pendingItems[session.pendingIndex];
-        await reply(sock, jid, `Quantas unidades de *${next.name}* você quer?`);
+        await reply(sock, jid, `Quantos pacotes de *${next.name}* você quer?`);
       } else {
         session.step = 'mais_itens';
         await reply(
@@ -149,7 +149,7 @@ export async function handleMessage(sock, jid, rawText, pushName) {
       session.pendingItems = validItems;
       session.pendingIndex = 0;
       session.step = 'quantidade';
-      await reply(sock, jid, `Quantas unidades de *${validItems[0].name}* você quer?`);
+      await reply(sock, jid, `Quantos pacotes de *${validItems[0].name}* você quer?`);
       break;
     }
 

@@ -4,64 +4,211 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Padaria — Pedidos</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
       :root {
         --bg: #faf3e3;
         --card: #fffdf8;
         --text: #3e2723;
-        --muted: #6b5c4e;
+        --muted: #8a7a6a;
         --accent: #a8442e;
         --accent-2: #5f7a52;
+        --wheat: #c68a2e;
+        --border: #efe3cd;
       }
+      * { box-sizing: border-box; }
       body {
         margin: 0;
-        font-family: Arial, sans-serif;
+        font-family: 'Work Sans', sans-serif;
         background: var(--bg);
         color: var(--text);
       }
       header {
         background: var(--text);
         color: white;
-        padding: 1.2rem 1.5rem;
+        padding: 1.5rem 1.5rem 1.7rem;
+      }
+      header h1 {
+        font-family: 'Fraunces', serif;
+        margin: 0 0 0.2rem;
+        font-size: 1.7rem;
+      }
+      header p {
+        margin: 0;
+        color: #d8b98f;
+        font-size: 0.9rem;
       }
       main {
-        max-width: 960px;
-        margin: 1.5rem auto;
-        padding: 0 1rem 2rem;
+        max-width: 1000px;
+        margin: -0.8rem auto 0;
+        padding: 0 1.2rem 3rem;
       }
       .controls {
         display: flex;
-        gap: 1rem;
+        gap: 0.8rem;
         flex-wrap: wrap;
-        margin-bottom: 1rem;
+        margin-bottom: 1.2rem;
+        background: var(--card);
+        padding: 0.9rem;
+        border-radius: 14px;
+        box-shadow: 0 4px 16px rgba(62,39,35,0.08);
       }
       input, select, button {
-        padding: 0.7rem 0.9rem;
+        padding: 0.65rem 0.9rem;
         border-radius: 8px;
-        border: 1px solid #ddd;
+        border: 1px solid var(--border);
+        font-family: inherit;
+        font-size: 0.9rem;
       }
       button {
         cursor: pointer;
         background: var(--accent);
         color: white;
         border: none;
+        font-weight: 600;
       }
+      button:hover { opacity: 0.92; }
       .summary {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-        gap: 1rem;
-        margin-bottom: 1rem;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 0.9rem;
+        margin-bottom: 1.4rem;
       }
       .summary-card {
         background: var(--card);
-        padding: 1rem;
-        border-radius: 10px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        padding: 1.1rem 1.3rem;
+        border-radius: 14px;
+        box-shadow: 0 4px 16px rgba(62,39,35,0.08);
       }
+      .summary-card strong {
+        display: block;
+        font-family: 'Fraunces', serif;
+        font-size: 1.6rem;
+      }
+      .summary-card .muted { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; }
       .orders {
         display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
         gap: 1rem;
       }
+      .order-card {
+        background: var(--card);
+        border-radius: 16px;
+        box-shadow: 0 4px 16px rgba(62,39,35,0.08);
+        border-left: 5px solid var(--wheat);
+        overflow: hidden;
+      }
+      .order-card.status-entregue { border-left-color: var(--accent-2); }
+      .order-card.status-cancelado { border-left-color: #aaa; opacity: 0.65; }
+      .order-card.status-pendente,
+      .order-card.status-confirmado { border-left-color: var(--accent); }
+
+      .order-top {
+        display: flex;
+        align-items: center;
+        gap: 0.8rem;
+        padding: 1rem 1.1rem 0.7rem;
+      }
+      .avatar {
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        background: var(--text);
+        color: white;
+        font-weight: 700;
+        display: grid;
+        place-items: center;
+        flex-shrink: 0;
+        font-family: 'Fraunces', serif;
+      }
+      .order-who { flex: 1; min-width: 0; }
+      .order-name {
+        font-weight: 700;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .order-phone {
+        color: var(--muted);
+        font-size: 0.85rem;
+      }
+      .status {
+        display: inline-block;
+        padding: 0.25rem 0.65rem;
+        border-radius: 999px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        white-space: nowrap;
+      }
+      .status-pendente .status, .status-confirmado .status { background: #f4e1d8; color: var(--accent); }
+      .status-entregue .status { background: #e4eadd; color: var(--accent-2); }
+      .status-cancelado .status { background: #eee; color: #888; }
+
+      .order-body { padding: 0 1.1rem 1rem; }
+      .order-items {
+        list-style: none;
+        margin: 0.4rem 0 0.7rem;
+        padding: 0;
+        display: grid;
+        gap: 0.25rem;
+      }
+      .order-items li {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.9rem;
+      }
+      .order-items li span:first-child { color: var(--text); }
+      .order-items li span:last-child { color: var(--muted); }
+
+      .order-total-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        padding-top: 0.6rem;
+        border-top: 1px dashed var(--border);
+      }
+      .order-total-row .label { color: var(--muted); font-size: 0.85rem; }
+      .order-total-row .value {
+        font-family: 'Fraunces', serif;
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: var(--accent);
+      }
+
+      .details-toggle {
+        width: 100%;
+        background: none;
+        border: none;
+        color: var(--accent);
+        font-weight: 600;
+        font-size: 0.82rem;
+        padding: 0.6rem 1.1rem;
+        text-align: left;
+        border-top: 1px solid var(--border);
+        cursor: pointer;
+      }
+      .order-details {
+        padding: 0 1.1rem 1rem;
+        font-size: 0.85rem;
+        color: var(--muted);
+        display: grid;
+        gap: 0.35rem;
+      }
+      .order-details.hidden { display: none; }
+      .order-details b { color: var(--text); }
+
+      .muted { color: var(--muted); }
+      .hidden { display: none; }
+      .empty {
+        text-align: center;
+        color: var(--muted);
+        padding: 3rem 0;
+        grid-column: 1 / -1;
+      }
+
       .login-screen {
         min-height: 100vh;
         display: grid;
@@ -69,7 +216,7 @@
         padding: 1.5rem;
       }
       .login-card {
-        width: min(100%, 420px);
+        width: min(100%, 400px);
         background: var(--card);
         border-radius: 20px;
         padding: 2rem;
@@ -77,52 +224,14 @@
       }
       .login-card h2 {
         margin: 0 0 0.4rem;
+        font-family: 'Fraunces', serif;
         font-size: 1.5rem;
       }
-      .login-card p {
-        margin: 0 0 1rem;
-        color: var(--muted);
-      }
-      .login-form {
-        display: grid;
-        gap: 0.8rem;
-      }
-      .login-form input {
-        width: 100%;
-      }
-      .login-form button {
-        width: 100%;
-        padding: 0.85rem;
-        font-weight: 700;
-      }
-      .login-error {
-        color: var(--accent);
-        font-size: 0.9rem;
-        min-height: 1.2rem;
-      }
-      .hidden {
-        display: none;
-      }
-      .order-card {
-        background: var(--card);
-        padding: 1rem;
-        border-radius: 10px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-      }
-      .status {
-        display: inline-block;
-        padding: 0.25rem 0.6rem;
-        border-radius: 999px;
-        font-size: 0.8rem;
-        font-weight: bold;
-        margin-bottom: 0.6rem;
-      }
-      .status-pendente { background: #f4e1d8; color: var(--accent); }
-      .status-confirmado { background: #f4e1d8; color: var(--accent); }
-      .status-entregue { background: #e4eadd; color: var(--accent-2); }
-      .status-cancelado { background: #eee; color: #888; }
-      .muted { color: var(--muted); }
-      .empty { text-align: center; color: var(--muted); padding: 2rem 0; }
+      .login-card p { margin: 0 0 1rem; color: var(--muted); }
+      .login-form { display: grid; gap: 0.8rem; }
+      .login-form input { width: 100%; }
+      .login-form button { width: 100%; padding: 0.85rem; font-weight: 700; }
+      .login-error { color: var(--accent); font-size: 0.9rem; min-height: 1.2rem; }
     </style>
   </head>
   <body>
@@ -139,11 +248,39 @@
     </div>
 
     <div id="appContent" class="hidden">
-      <div id="header"></div>
+      <header>
+        <h1>🥖 Padaria — Pedidos</h1>
+        <p>Visualize os pedidos do banco em tempo real.</p>
+      </header>
 
       <main>
-        <div id="controls"></div>
-        <div id="summary"></div>
+        <div class="controls">
+          <input id="day" type="date" />
+          <select id="status">
+            <option value="">Todos</option>
+            <option value="pendente">Pendente</option>
+            <option value="confirmado">Confirmado</option>
+            <option value="entregue">Entregue</option>
+            <option value="cancelado">Cancelado</option>
+          </select>
+          <button id="refresh">Atualizar</button>
+        </div>
+
+        <div class="summary">
+          <div class="summary-card">
+            <strong id="count">0</strong>
+            <div class="muted">Pedidos</div>
+          </div>
+          <div class="summary-card">
+            <strong id="pendentes">0</strong>
+            <div class="muted">Pendentes</div>
+          </div>
+          <div class="summary-card">
+            <strong id="total">R$ 0,00</strong>
+            <div class="muted">Total</div>
+          </div>
+        </div>
+
         <div id="orders" class="orders"></div>
       </main>
     </div>
@@ -171,25 +308,12 @@
         return loadOrders(true);
       }
 
-      async function loadPartial(file, targetId) {
-        const response = await fetch(file);
-        const html = await response.text();
-        document.getElementById(targetId).innerHTML = html;
-      }
-
       async function loadPage() {
-        await Promise.all([
-          loadPartial('header.html', 'header'),
-          loadPartial('controls.html', 'controls'),
-          loadPartial('summary.html', 'summary')
-        ]);
-
         const storedPassword = sessionStorage.getItem('painelSenha');
         if (storedPassword) {
           showApp();
           return loadOrders();
         }
-
         showLogin();
       }
 
@@ -223,6 +347,21 @@
         return Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
       }
 
+      // Deixa o número tipo "556599999999" mais legível: (65) 99999-9999
+      function formatPhone(jid) {
+        const digits = (jid || '').split('@')[0].replace(/\D/g, '');
+        if (digits.length < 10) return digits || '—';
+        const ddd = digits.slice(2, 4);
+        const rest = digits.slice(4);
+        const half = rest.length > 8 ? rest.length - 4 : Math.ceil(rest.length / 2);
+        return `(${ddd}) ${rest.slice(0, half)}-${rest.slice(half)}`;
+      }
+
+      function initials(name) {
+        if (!name) return '?';
+        return name.trim().split(/\s+/).slice(0, 2).map((p) => p[0].toUpperCase()).join('');
+      }
+
       function renderOrders(orders) {
         const container = document.getElementById('orders');
         document.getElementById('count').textContent = orders.length;
@@ -234,17 +373,36 @@
           return;
         }
 
-        container.innerHTML = orders.map((order) => {
-          const items = order.items?.map((item) => `<li>${item.quantity}× ${item.name}</li>`).join('') || '';
+        container.innerHTML = orders.map((order, idx) => {
+          const name = order.customerName || 'Cliente sem nome';
+          const items = order.items?.map((item) => {
+            const qty = item.quantity === 1 ? '1 pacote' : `${item.quantity} pacotes`;
+            return `<li><span>${qty} de ${item.name}</span><span>${formatCurrency(item.price * item.quantity)}</span></li>`;
+          }).join('') || '';
+
           return `
-            <article class="order-card">
-              <span class="status status-${order.status}">${order.status}</span>
-              <p><strong>#${String(order._id).slice(-6)}</strong></p>
-              <p class="muted">Cliente: ${order.customerName || order.customerJid || '—'}</p>
-              <p class="muted">Endereço: ${order.address || '—'}</p>
-              <ul>${items}</ul>
-              <p><strong>Total:</strong> ${formatCurrency(order.total)}</p>
-              <p class="muted">Criado em: ${new Date(order.createdAt).toLocaleString('pt-BR')}</p>
+            <article class="order-card status-${order.status}">
+              <div class="order-top">
+                <div class="avatar">${initials(name)}</div>
+                <div class="order-who">
+                  <div class="order-name">${name}</div>
+                  <div class="order-phone">📱 ${formatPhone(order.customerJid)}</div>
+                </div>
+                <span class="status">${order.status}</span>
+              </div>
+              <div class="order-body">
+                <ul class="order-items">${items}</ul>
+                <div class="order-total-row">
+                  <span class="label">Total do pedido</span>
+                  <span class="value">${formatCurrency(order.total)}</span>
+                </div>
+              </div>
+              <button class="details-toggle" data-idx="${idx}">▾ Mais detalhes</button>
+              <div class="order-details hidden" data-idx="${idx}">
+                <div><b>Pedido:</b> #${String(order._id).slice(-6)}</div>
+                <div><b>Endereço:</b> ${order.address || '—'}</div>
+                <div><b>Criado em:</b> ${new Date(order.createdAt).toLocaleString('pt-BR')}</div>
+              </div>
             </article>
           `;
         }).join('');
@@ -262,11 +420,19 @@
       });
 
       document.addEventListener('DOMContentLoaded', loadPage);
+
       document.addEventListener('click', (event) => {
         if (event.target.id === 'refresh') {
           loadOrders();
         }
+        if (event.target.classList.contains('details-toggle')) {
+          const idx = event.target.dataset.idx;
+          const panel = document.querySelector(`.order-details[data-idx="${idx}"]`);
+          panel.classList.toggle('hidden');
+          event.target.textContent = panel.classList.contains('hidden') ? '▾ Mais detalhes' : '▴ Menos detalhes';
+        }
       });
+
       document.addEventListener('change', (event) => {
         if (event.target.id === 'day' || event.target.id === 'status') {
           loadOrders();

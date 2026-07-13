@@ -1,11 +1,11 @@
 // Edite esta lista para mudar os produtos, preços e unidades do seu pai.
 // "id" é o número que o cliente vai digitar no WhatsApp para escolher o item.
 export const MENU = [
-  { id: 1, name: 'Pão Francês (unidade)', price: 0.75 },
-  { id: 2, name: 'Pão de Forma', price: 8.5 },
-  { id: 3, name: 'Pão Doce (unidade)', price: 3.5 },
-  { id: 4, name: 'Broa de Milho', price: 5.5 },
-  { id: 5, name: 'Rosca de Canela', price: 12.0 },
+  { id: 1, name: 'Pão Francês (pacote)', price: 0.75 },
+  { id: 2, name: 'Pão de Forma (pacote)', price: 8.5 },
+  { id: 3, name: 'Pão Doce (pacote)', price: 3.5 },
+  { id: 4, name: 'Broa de Milho (pacote)', price: 5.5 },
+  { id: 5, name: 'Rosca de Canela (pacote)', price: 12.0 },
 ];
 
 export function formatMoney(value) {
