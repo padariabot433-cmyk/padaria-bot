@@ -324,19 +324,43 @@
         if (day) url.searchParams.set('day', day);
         if (status) url.searchParams.set('status', status);
 
-        const response = await fetch(url, {
-          headers: { Authorization: getAuthHeader() },
-        });
+        const errorEl = document.getElementById('loginError');
+        // Mostra que algo está acontecendo enquanto espera a resposta
+        if (isLoginAttempt) errorEl.textContent = 'Verificando...';
+
+        let response;
+        try {
+          response = await fetch(url, {
+            headers: { Authorization: getAuthHeader() },
+          });
+        } catch (err) {
+          // Erro de rede/CORS: o fetch nem chegou a ter uma resposta do servidor
+          errorEl.textContent = 'Não foi possível conectar ao servidor. Verifique sua internet e tente de novo.';
+          console.error('Erro de rede ao buscar pedidos:', err);
+          return;
+        }
 
         if (response.status === 401) {
           sessionStorage.removeItem('painelSenha');
           if (isLoginAttempt) {
-            document.getElementById('loginError').textContent = 'Senha incorreta. Tente novamente.';
+            errorEl.textContent = 'Senha incorreta. Tente novamente.';
           } else {
             showLogin();
           }
           return;
         }
+
+        if (response.status === 429) {
+          errorEl.textContent = 'Muitas tentativas erradas. Aguarde alguns minutos antes de tentar de novo.';
+          return;
+        }
+
+        if (!response.ok) {
+          errorEl.textContent = `Erro inesperado do servidor (código ${response.status}). Tente novamente em instantes.`;
+          return;
+        }
+
+        if (isLoginAttempt) errorEl.textContent = '';
 
         const orders = await response.json();
         renderOrders(orders);
