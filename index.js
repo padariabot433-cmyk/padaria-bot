@@ -13,11 +13,21 @@ import { handleMessage } from './src/orderFlow.js';
 import { adminAuth } from './src/adminAuth.js';
 import { adminRouter } from './src/adminRoutes.js';
 import { startDailyReminder } from './src/dailyReminder.js';
+import { startWeeklyBackup } from './src/backup.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
 const ALLOWED_ORIGIN = process.env.SITE_ORIGIN || 'https://padariabot433-cmyk.github.io';
 const app = express();
+
+function checkPasswordStrength(password) {
+  if (!password) return;
+  const isWeak = password.length < 8 || /^(123456|senha|padaria|admin|password)$/i.test(password);
+  if (isWeak) {
+    console.log('⚠️ ADMIN_PASSWORD parece fraca (curta ou muito comum). Considere trocar por algo mais forte.');
+  }
+}
+checkPasswordStrength(process.env.ADMIN_PASSWORD);
 app.use(express.urlencoded({ extended: true })); // para ler os formulários do painel
 app.use(express.json());
 app.use((req, res, next) => {
@@ -130,10 +140,26 @@ async function startBot() {
     if (connection === 'close') {
       connectionStatus = 'desconectado';
       const statusCode = lastDisconnect?.error?.output?.statusCode;
-      const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+
+      // 440 = connectionReplaced: outra instância conectou com a MESMA sessão
+      // (ex: deploy novo subindo antes do antigo desligar). Reconectar aqui só
+      // alimenta um cabo de guerra infinito entre as duas instâncias.
+      const isConflict = statusCode === DisconnectReason.connectionReplaced;
+      const shouldReconnect = statusCode !== DisconnectReason.loggedOut && !isConflict;
+
       console.log('Conexão fechada.', statusCode, 'Reconectar?', shouldReconnect);
+
+      if (isConflict) {
+        console.log(
+          '⚠️ Sessão substituída por outra conexão (provavelmente duas instâncias rodando ao mesmo tempo). ' +
+          'Esta instância vai parar de tentar reconectar.'
+        );
+        return;
+      }
+
       if (shouldReconnect) {
-        startBot();
+        // Pequeno atraso evita um loop de reconexão imediato e agressivo
+        setTimeout(() => startBot(), 3000);
       } else {
         console.log('Sessão encerrada (logout). Apague o auth no MongoDB para gerar novo QR.');
       }
@@ -144,6 +170,7 @@ async function startBot() {
 
       if (!reminderStarted) {
         startDailyReminder(sock);
+        startWeeklyBackup(sock);
         reminderStarted = true;
       }
     }
@@ -178,6 +205,16 @@ async function startBot() {
     }
   });
 }
+
+// Erros vindos de dentro do Baileys (ex: timeout ao renovar pré-chaves) às vezes
+// escapam de qualquer try/catch nosso e, sem isso aqui, derrubam o processo inteiro
+// (o que faz o Render reiniciar o serviço e recomeçar o ciclo de conflito de sessão).
+process.on('unhandledRejection', (err) => {
+  console.error('⚠️ Erro não tratado (unhandledRejection), ignorando para manter o bot no ar:', err);
+});
+process.on('uncaughtException', (err) => {
+  console.error('⚠️ Exceção não tratada (uncaughtException), ignorando para manter o bot no ar:', err);
+});
 
 startBot().catch((err) => {
   console.error('Erro fatal ao iniciar o bot:', err);

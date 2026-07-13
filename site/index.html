@@ -374,21 +374,28 @@
         }
 
         container.innerHTML = orders.map((order, idx) => {
-          const name = order.customerName || 'Cliente sem nome';
+          const escapeHtml = (value) => String(value ?? '')
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#39;');
+
+          const name = escapeHtml(order.customerName || 'Cliente sem nome');
           const items = order.items?.map((item) => {
             const qty = item.quantity === 1 ? '1 pacote' : `${item.quantity} pacotes`;
-            return `<li><span>${qty} de ${item.name}</span><span>${formatCurrency(item.price * item.quantity)}</span></li>`;
+            return `<li><span>${escapeHtml(`${qty} de ${item.name}`)}</span><span>${formatCurrency(item.price * item.quantity)}</span></li>`;
           }).join('') || '';
 
           return `
-            <article class="order-card status-${order.status}">
+            <article class="order-card status-${escapeHtml(order.status)}">
               <div class="order-top">
-                <div class="avatar">${initials(name)}</div>
+                <div class="avatar">${escapeHtml(initials(order.customerName || 'Cliente sem nome'))}</div>
                 <div class="order-who">
                   <div class="order-name">${name}</div>
-                  <div class="order-phone">📱 ${formatPhone(order.customerJid)}</div>
+                  <div class="order-phone">📱 ${escapeHtml(formatPhone(order.customerJid))}</div>
                 </div>
-                <span class="status">${order.status}</span>
+                <span class="status">${escapeHtml(order.status)}</span>
               </div>
               <div class="order-body">
                 <ul class="order-items">${items}</ul>
@@ -399,9 +406,9 @@
               </div>
               <button class="details-toggle" data-idx="${idx}">▾ Mais detalhes</button>
               <div class="order-details hidden" data-idx="${idx}">
-                <div><b>Pedido:</b> #${String(order._id).slice(-6)}</div>
-                <div><b>Endereço:</b> ${order.address || '—'}</div>
-                <div><b>Criado em:</b> ${new Date(order.createdAt).toLocaleString('pt-BR')}</div>
+                <div><b>Pedido:</b> #${escapeHtml(String(order._id).slice(-6))}</div>
+                <div><b>Endereço:</b> ${escapeHtml(order.address || '—')}</div>
+                <div><b>Criado em:</b> ${escapeHtml(new Date(order.createdAt).toLocaleString('pt-BR'))}</div>
               </div>
             </article>
           `;

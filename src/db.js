@@ -35,3 +35,23 @@ const orderSchema = new mongoose.Schema({
 });
 
 export const Order = mongoose.model('Order', orderSchema);
+
+const pendingItemSchema = new mongoose.Schema(
+  { id: Number, name: String, price: Number },
+  { _id: false }
+);
+
+const sessionSchema = new mongoose.Schema(
+  {
+    jid: { type: String, required: true, unique: true },
+    step: { type: String, default: 'inicio' },
+    cart: [orderItemSchema],
+    address: String,
+    pendingItems: [pendingItemSchema],
+    pendingIndex: Number,
+    updatedAt: { type: Date, default: Date.now },
+  },
+  { collection: 'whatsapp_sessions' }
+);
+
+export const Session = mongoose.model('Session', sessionSchema);

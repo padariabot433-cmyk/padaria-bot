@@ -1,20 +1,5 @@
 import { MENU, findItem, buildMenuText, formatMoney } from './menu.js';
-import { Order } from './db.js';
-
-// Guarda o estado da conversa de cada cliente em memória.
-// (se o bot reiniciar no meio de um pedido, o cliente simplesmente começa de novo)
-const sessions = new Map();
-
-function getSession(jid) {
-  if (!sessions.has(jid)) {
-    sessions.set(jid, { step: 'inicio', cart: [], address: null });
-  }
-  return sessions.get(jid);
-}
-
-function resetSession(jid) {
-  sessions.set(jid, { step: 'inicio', cart: [], address: null });
-}
+import { Order, Session } from './db.js';
 
 function cartTotal(cart) {
   return cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -28,7 +13,24 @@ function cartSummaryText(cart) {
   return lines.join('\n') + `\n\n*Total: ${formatMoney(cartTotal(cart))}*`;
 }
 
-// Envia uma mensagem de texto simples
+// Sessão agora vive no MongoDB — sobrevive a reinícios do bot
+async function getSession(jid) {
+  let session = await Session.findOne({ jid });
+  if (!session) {
+    session = await Session.create({ jid, step: 'inicio', cart: [], address: null });
+  }
+  return session;
+}
+
+async function resetSession(jid) {
+  await Session.deleteOne({ jid });
+}
+
+async function saveSession(session) {
+  session.updatedAt = new Date();
+  await session.save();
+}
+
 async function reply(sock, jid, text) {
   await sock.sendMessage(jid, { text });
 }
@@ -36,11 +38,10 @@ async function reply(sock, jid, text) {
 export async function handleMessage(sock, jid, rawText, pushName) {
   const text = (rawText || '').trim();
   const lower = text.toLowerCase();
-  const session = getSession(jid);
+  const session = await getSession(jid);
 
-  // Comando universal para cancelar/recomeçar a qualquer momento
   if (['cancelar', 'sair', 'reiniciar'].includes(lower)) {
-    resetSession(jid);
+    await resetSession(jid);
     await reply(sock, jid, 'Pedido cancelado. Digite qualquer mensagem para começar de novo. 🙂');
     return;
   }
@@ -48,16 +49,16 @@ export async function handleMessage(sock, jid, rawText, pushName) {
   switch (session.step) {
     case 'inicio': {
       session.step = 'menu';
+      await saveSession(session);
       await reply(
         sock,
         jid,
-        `Olá${pushName ? ', ' + pushName : ''}! 👋 Bom dia.\n\n${buildMenuText()}`
+        `Olá${pushName ? ', ' + pushName : ''}! 👋 Bem-vindo(a) à Padaria.\n\n${buildMenuText()}`
       );
       break;
     }
 
     case 'menu': {
-      // Espera algo como "1,3" ou "2"
       const ids = lower
         .split(',')
         .map((s) => parseInt(s.trim(), 10))
@@ -75,15 +76,11 @@ export async function handleMessage(sock, jid, rawText, pushName) {
         return;
       }
 
-      // Adiciona ao carrinho (quantidade 1 por padrão; perguntamos a quantidade em seguida)
       session.pendingItems = validItems;
       session.step = 'quantidade';
       session.pendingIndex = 0;
-      await reply(
-        sock,
-        jid,
-        `Quantos pacotes de *${validItems[0].name}* você quer?`
-      );
+      await saveSession(session);
+      await reply(sock, jid, `Quantos pacotes de *${validItems[0].name}* você quer?`);
       break;
     }
 
@@ -106,9 +103,11 @@ export async function handleMessage(sock, jid, rawText, pushName) {
 
       if (session.pendingIndex < session.pendingItems.length) {
         const next = session.pendingItems[session.pendingIndex];
+        await saveSession(session);
         await reply(sock, jid, `Quantos pacotes de *${next.name}* você quer?`);
       } else {
         session.step = 'mais_itens';
+        await saveSession(session);
         await reply(
           sock,
           jid,
@@ -126,11 +125,11 @@ export async function handleMessage(sock, jid, rawText, pushName) {
           return;
         }
         session.step = 'endereco';
+        await saveSession(session);
         await reply(sock, jid, 'Perfeito! Agora me diga o *endereço de entrega* completo.');
         return;
       }
 
-      // Se digitou números, volta pro fluxo de adicionar itens
       const ids = lower
         .split(',')
         .map((s) => parseInt(s.trim(), 10))
@@ -149,6 +148,7 @@ export async function handleMessage(sock, jid, rawText, pushName) {
       session.pendingItems = validItems;
       session.pendingIndex = 0;
       session.step = 'quantidade';
+      await saveSession(session);
       await reply(sock, jid, `Quantos pacotes de *${validItems[0].name}* você quer?`);
       break;
     }
@@ -156,6 +156,7 @@ export async function handleMessage(sock, jid, rawText, pushName) {
     case 'endereco': {
       session.address = text;
       session.step = 'confirmacao';
+      await saveSession(session);
       await reply(
         sock,
         jid,
@@ -184,7 +185,6 @@ export async function handleMessage(sock, jid, rawText, pushName) {
             'Obrigado pela preferência, já vamos preparar seu pedido!'
         );
 
-        // Avisa o admin (seu pai) sobre o novo pedido, se configurado
         const admin = process.env.ADMIN_NUMBER;
         if (admin) {
           const adminJid = admin.includes('@') ? admin : `${admin}@s.whatsapp.net`;
@@ -195,9 +195,9 @@ export async function handleMessage(sock, jid, rawText, pushName) {
           );
         }
 
-        resetSession(jid);
+        await resetSession(jid);
       } else if (lower === '2' || lower === 'cancelar') {
-        resetSession(jid);
+        await resetSession(jid);
         await reply(sock, jid, 'Pedido cancelado. Digite qualquer mensagem para começar de novo.');
       } else {
         await reply(sock, jid, 'Digite *1* para confirmar ou *2* para cancelar.');
@@ -206,7 +206,7 @@ export async function handleMessage(sock, jid, rawText, pushName) {
     }
 
     default: {
-      resetSession(jid);
+      await resetSession(jid);
       await reply(sock, jid, 'Vamos começar de novo! Digite qualquer mensagem para ver o cardápio.');
     }
   }
