@@ -51,7 +51,7 @@ export async function handleMessage(sock, jid, rawText, pushName) {
       await reply(
         sock,
         jid,
-        `Olá${pushName ? ', ' + pushName : ''}! 👋 Bem-vindo(a) à Padaria.\n\n${buildMenuText()}`
+        `Olá${pushName ? ', ' + pushName : ''}! 👋 Bom dia.\n\n${buildMenuText()}`
       );
       break;
     }

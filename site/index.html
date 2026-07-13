@@ -96,6 +96,15 @@
     <script>
       const API_URL = 'https://padaria-bot.onrender.com/api/orders';
 
+      function getAuthHeader() {
+        let pass = sessionStorage.getItem('painelSenha');
+        if (!pass) {
+          pass = prompt('Digite a senha do painel:');
+          if (pass) sessionStorage.setItem('painelSenha', pass);
+        }
+        return 'Basic ' + btoa('padaria:' + (pass || ''));
+      }
+
       async function loadPartial(file, targetId) {
         const response = await fetch(file);
         const html = await response.text();
@@ -118,9 +127,17 @@
         if (day) url.searchParams.set('day', day);
         if (status) url.searchParams.set('status', status);
 
-        const response = await fetch(url);
-        const orders = await response.json();
+        const response = await fetch(url, {
+          headers: { Authorization: getAuthHeader() },
+        });
 
+        if (response.status === 401) {
+          sessionStorage.removeItem('painelSenha');
+          alert('Senha incorreta.');
+          return;
+        }
+
+        const orders = await response.json();
         renderOrders(orders);
       }
 

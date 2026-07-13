@@ -17,7 +17,7 @@ export function buildMenuText() {
     (item) => `${item.id}. ${item.name} - ${formatMoney(item.price)}`
   );
   return (
-    '🥖 *Cardápio de hoje*\n\n' +
+    '🥖 *Cardápio*\n\n' +
     lines.join('\n') +
     '\n\nDigite o *número* do item que deseja (ex: "1").\n' +
     'Para pedir mais de um item, digite os números separados por vírgula (ex: "1,3").'
