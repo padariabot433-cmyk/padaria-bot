@@ -55,7 +55,14 @@ async function saveSession(session) {
 }
 
 async function reply(sock, jid, text) {
-  await sock.sendMessage(jid, { text });
+  try {
+    console.log(`📤 Tentando enviar mensagem para ${jid}...`);
+    const result = await sock.sendMessage(jid, { text });
+    console.log(`✅ sendMessage retornou OK para ${jid} (id da msg: ${result?.key?.id || 'sem id'})`);
+  } catch (err) {
+    console.error(`❌ sendMessage FALHOU para ${jid}:`, err);
+    throw err;
+  }
 }
 
 export async function handleMessage(sock, jid, rawText, pushName, realPhoneJid) {
@@ -63,9 +70,14 @@ export async function handleMessage(sock, jid, rawText, pushName, realPhoneJid) 
   const lower = text.toLowerCase();
   const session = await getSession(jid);
 
+  // Responder pro telefone real (quando disponível) é mais confiável do que
+  // responder pro @lid — o Baileys tem um bug conhecido onde mensagens
+  // enviadas pra @lid às vezes não chegam, sem erro nenhum.
+  const replyTo = realPhoneJid || jid;
+
   if (['cancelar', 'sair', 'reiniciar'].includes(lower)) {
     await resetSession(jid);
-    await reply(sock, jid, 'Pedido cancelado. Digite qualquer mensagem para começar de novo. 🙂');
+    await reply(sock, replyTo, 'Pedido cancelado. Digite qualquer mensagem para começar de novo. 🙂');
     return;
   }
 

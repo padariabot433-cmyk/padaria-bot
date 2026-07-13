@@ -299,6 +299,12 @@ async function startBot() {
       // salvar o contato — a resposta continua indo pro "jid" original (@lid).
       const realPhoneJid = msg.key.remoteJidAlt || jid;
 
+      if (realPhoneJid !== jid) {
+        console.log(`ℹ️ Contato veio como @lid (${jid}), telefone real encontrado: ${realPhoneJid}`);
+      } else {
+        console.log(`ℹ️ Contato sem telefone real disponível, vamos responder pelo @lid mesmo: ${jid}`);
+      }
+
       const text =
         msg.message.conversation ||
         msg.message.extendedTextMessage?.text ||
