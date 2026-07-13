@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Padaria — Pedidos</title>
+    <style>
+      :root {
+        --bg: #faf3e3;
+        --card: #fffdf8;
+        --text: #3e2723;
+        --muted: #6b5c4e;
+        --accent: #a8442e;
+        --accent-2: #5f7a52;
+      }
+      body {
+        margin: 0;
+        font-family: Arial, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+      header {
+        background: var(--text);
+        color: white;
+        padding: 1.2rem 1.5rem;
+      }
+      main {
+        max-width: 960px;
+        margin: 1.5rem auto;
+        padding: 0 1rem 2rem;
+      }
+      .controls {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+        margin-bottom: 1rem;
+      }
+      input, select, button {
+        padding: 0.7rem 0.9rem;
+        border-radius: 8px;
+        border: 1px solid #ddd;
+      }
+      button {
+        cursor: pointer;
+        background: var(--accent);
+        color: white;
+        border: none;
+      }
+      .summary {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 1rem;
+        margin-bottom: 1rem;
+      }
+      .summary-card {
+        background: var(--card);
+        padding: 1rem;
+        border-radius: 10px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      }
+      .orders {
+        display: grid;
+        gap: 1rem;
+      }
+      .order-card {
+        background: var(--card);
+        padding: 1rem;
+        border-radius: 10px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      }
+      .status {
+        display: inline-block;
+        padding: 0.25rem 0.6rem;
+        border-radius: 999px;
+        font-size: 0.8rem;
+        font-weight: bold;
+        margin-bottom: 0.6rem;
+      }
+      .status-pendente { background: #f4e1d8; color: var(--accent); }
+      .status-confirmado { background: #f4e1d8; color: var(--accent); }
+      .status-entregue { background: #e4eadd; color: var(--accent-2); }
+      .status-cancelado { background: #eee; color: #888; }
+      .muted { color: var(--muted); }
+      .empty { text-align: center; color: var(--muted); padding: 2rem 0; }
+    </style>
+  </head>
+  <body>
+    <div id="header"></div>
+
+    <main>
+      <div id="controls"></div>
+      <div id="summary"></div>
+      <div id="orders" class="orders"></div>
+    </main>
+
+    <script>
+      const API_URL = 'https://padaria-bot.onrender.com/api/orders';
+
+      async function loadPartial(file, targetId) {
+        const response = await fetch(file);
+        const html = await response.text();
+        document.getElementById(targetId).innerHTML = html;
+      }
+
+      async function loadPage() {
+        await Promise.all([
+          loadPartial('header.html', 'header'),
+          loadPartial('controls.html', 'controls'),
+          loadPartial('summary.html', 'summary')
+        ]);
+        loadOrders();
+      }
+
+      async function loadOrders() {
+        const day = document.getElementById('day').value;
+        const status = document.getElementById('status').value;
+        const url = new URL(API_URL);
+        if (day) url.searchParams.set('day', day);
+        if (status) url.searchParams.set('status', status);
+
+        const response = await fetch(url);
+        const orders = await response.json();
+
+        renderOrders(orders);
+      }
+
+      function formatCurrency(value) {
+        return Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+      }
+
+      function renderOrders(orders) {
+        const container = document.getElementById('orders');
+        document.getElementById('count').textContent = orders.length;
+        document.getElementById('pendentes').textContent = orders.filter((o) => o.status === 'pendente').length;
+        document.getElementById('total').textContent = formatCurrency(orders.reduce((sum, o) => sum + Number(o.total || 0), 0));
+
+        if (!orders.length) {
+          container.innerHTML = '<div class="empty">Nenhum pedido encontrado.</div>';
+          return;
+        }
+
+        container.innerHTML = orders.map((order) => {
+          const items = order.items?.map((item) => `<li>${item.quantity}× ${item.name}</li>`).join('') || '';
+          return `
+            <article class="order-card">
+              <span class="status status-${order.status}">${order.status}</span>
+              <p><strong>#${String(order._id).slice(-6)}</strong></p>
+              <p class="muted">Cliente: ${order.customerName || order.customerJid || '—'}</p>
+              <p class="muted">Endereço: ${order.address || '—'}</p>
+              <ul>${items}</ul>
+              <p><strong>Total:</strong> ${formatCurrency(order.total)}</p>
+              <p class="muted">Criado em: ${new Date(order.createdAt).toLocaleString('pt-BR')}</p>
+            </article>
+          `;
+        }).join('');
+      }
+
+      document.addEventListener('DOMContentLoaded', loadPage);
+      document.addEventListener('click', (event) => {
+        if (event.target.id === 'refresh') {
+          loadOrders();
+        }
+      });
+      document.addEventListener('change', (event) => {
+        if (event.target.id === 'day' || event.target.id === 'status') {
+          loadOrders();
+        }
+      });
+    </script>
+  </body>
+</html>

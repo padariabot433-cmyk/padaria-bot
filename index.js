@@ -1,10 +1,11 @@
 import 'dotenv/config';
 import express from 'express';
+import mongoose from 'mongoose';
 import qrcode from 'qrcode';
 import pino from 'pino';
 import makeWASocket, { DisconnectReason, fetchLatestBaileysVersion } from '@whiskeysockets/baileys';
 
-import { connectDB } from './src/db.js';
+import { connectDB, Order } from './src/db.js';
 import { useMongoAuthState } from './src/authState.js';
 import { handleMessage } from './src/orderFlow.js';
 import { adminAuth } from './src/adminAuth.js';
@@ -13,6 +14,16 @@ import { adminRouter } from './src/adminRoutes.js';
 const PORT = process.env.PORT || 3000;
 const app = express();
 app.use(express.urlencoded({ extended: true })); // para ler os formulários do painel
+app.use(express.json());
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
+  next();
+});
 
 let latestQR = null;
 let connectionStatus = 'iniciando';
@@ -23,6 +34,35 @@ app.get('/', (req, res) => {
 
 // Painel de pedidos, protegido por senha (ADMIN_PASSWORD no .env)
 app.use('/pedidos', adminAuth, adminRouter);
+
+app.get('/api/orders', async (req, res) => {
+  try {
+    if (mongoose.connection.readyState !== 1) {
+      await connectDB();
+    }
+
+    const { limit = 50, status, day } = req.query;
+    const query = {};
+
+    if (status) {
+      query.status = status;
+    }
+
+    if (day) {
+      const start = new Date(day);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(day);
+      end.setHours(23, 59, 59, 999);
+      query.createdAt = { $gte: start, $lte: end };
+    }
+
+    const orders = await Order.find(query).sort({ createdAt: -1 }).limit(Number(limit));
+    res.json(orders);
+  } catch (error) {
+    console.error('Erro ao buscar pedidos:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // Página simples para escanear o QR code sem precisar olhar o terminal
 app.get('/qr', async (req, res) => {
