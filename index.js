@@ -12,6 +12,7 @@ import { useMongoAuthState } from './src/authState.js';
 import { handleMessage } from './src/orderFlow.js';
 import { adminAuth } from './src/adminAuth.js';
 import { adminRouter } from './src/adminRoutes.js';
+import { startDailyReminder } from './src/dailyReminder.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
@@ -21,6 +22,7 @@ app.use(express.json());
 
 let latestQR = null;
 let connectionStatus = 'iniciando';
+let reminderStarted = false;
 
 // Serve a página de redirecionamento (index.html da raiz)
 app.get('/', (req, res) => {
@@ -129,6 +131,11 @@ async function startBot() {
       connectionStatus = 'conectado';
       latestQR = null;
       console.log('✅ WhatsApp conectado com sucesso!');
+
+      if (!reminderStarted) {
+        startDailyReminder(sock);
+        reminderStarted = true;
+      }
     }
   });
 
