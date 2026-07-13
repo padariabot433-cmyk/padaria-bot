@@ -39,7 +39,7 @@ const ALLOWED_ORIGIN = process.env.SITE_ORIGIN || 'https://padariabot433-cmyk.gi
 
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', ALLOWED_ORIGIN);
-  res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.header('Access-Control-Allow-Methods', 'GET, PATCH, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') {
     return res.sendStatus(204);
@@ -92,6 +92,58 @@ app.get('/api/orders', adminAuth, async (req, res) => {
     res.json(orders);
   } catch (error) {
     console.error('Erro ao buscar pedidos:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.patch('/api/orders/:id', adminAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = {};
+    const allowed = ['customerName', 'customerJid', 'address', 'status', 'items', 'total'];
+
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) {
+        updates[key] = req.body[key];
+      }
+    }
+
+    if (updates.status && !['pendente', 'confirmado', 'entregue', 'cancelado'].includes(updates.status)) {
+      return res.status(400).json({ error: 'Status inválido.' });
+    }
+
+    if (updates.items && !Array.isArray(updates.items)) {
+      return res.status(400).json({ error: 'Itens devem ser um array.' });
+    }
+
+    if (updates.items && !updates.total) {
+      updates.total = updates.items.reduce((sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0), 0);
+    }
+
+    const order = await Order.findById(id);
+    if (!order) {
+      return res.status(404).json({ error: 'Pedido não encontrado.' });
+    }
+
+    Object.assign(order, updates);
+    await order.save();
+    res.json(order);
+  } catch (error) {
+    console.error('Erro ao editar pedido:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/orders/:id', adminAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const order = await Order.findByIdAndDelete(id);
+    if (!order) {
+      return res.status(404).json({ error: 'Pedido não encontrado.' });
+    }
+    res.json({ deleted: true });
+  } catch (error) {
+    console.error('Erro ao excluir pedido:', error);
     res.status(500).json({ error: error.message });
   }
 });

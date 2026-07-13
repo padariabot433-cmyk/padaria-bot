@@ -200,6 +200,72 @@
       .order-details.hidden { display: none; }
       .order-details b { color: var(--text); }
 
+      .card-actions {
+        display: flex;
+        gap: 0.6rem;
+        flex-wrap: wrap;
+        padding: 0 1.1rem 1rem;
+      }
+      .card-actions button {
+        border: 1px solid transparent;
+        border-radius: 10px;
+        padding: 0.55rem 0.9rem;
+        font-size: 0.9rem;
+        background: var(--card);
+        color: var(--text);
+        transition: transform 0.15s ease, background 0.15s ease;
+      }
+      .card-actions button:hover { transform: translateY(-1px); }
+      .edit-order-button { border-color: var(--accent); color: var(--accent); }
+      .delete-order-button { border-color: #b43728; color: #b43728; }
+
+      .edit-panel {
+        padding: 1rem 1.1rem 1.2rem;
+        background: #fff9f4;
+        border-top: 1px solid #f0e4d8;
+        display: grid;
+        gap: 0.8rem;
+      }
+      .edit-panel.hidden { display: none; }
+      .edit-field {
+        display: grid;
+        gap: 0.35rem;
+      }
+      .edit-field label {
+        font-size: 0.82rem;
+        color: var(--text);
+        font-weight: 600;
+      }
+      .edit-field input,
+      .edit-field textarea,
+      .edit-field select {
+        width: 100%;
+        padding: 0.7rem 0.85rem;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        font-family: inherit;
+        font-size: 0.9rem;
+      }
+      .edit-actions {
+        display: flex;
+        gap: 0.7rem;
+        flex-wrap: wrap;
+      }
+      .edit-actions button {
+        flex: 1 1 140px;
+      }
+      .save-order-button { background: var(--accent); color: white; }
+      .cancel-edit-button { background: #f4f1ec; color: var(--text); }
+      .delete-order-panel-button {
+        background: #b43728;
+        color: white;
+      }
+      .order-action-message {
+        color: var(--accent);
+        font-size: 0.88rem;
+        min-height: 1.1rem;
+      }
+
       .muted { color: var(--muted); }
       .hidden { display: none !important; }
       .empty {
@@ -287,10 +353,43 @@
 
     <script>
       const API_URL = 'https://padaria-bot-cbf7.onrender.com/api/orders';
+      let currentOrders = [];
 
       function getAuthHeader() {
         const pass = sessionStorage.getItem('painelSenha');
         return 'Basic ' + btoa('padaria:' + (pass || ''));
+      }
+
+      function getOrderById(orderId) {
+        return currentOrders.find((order) => String(order._id) === String(orderId));
+      }
+
+      async function patchOrder(orderId, updates) {
+        const response = await fetch(`${API_URL}/${orderId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: getAuthHeader(),
+          },
+          body: JSON.stringify(updates),
+        });
+        if (!response.ok) {
+          const payload = await response.json().catch(() => ({}));
+          throw new Error(payload.error || `Falha ao atualizar pedido (${response.status})`);
+        }
+        return response.json();
+      }
+
+      async function deleteOrder(orderId) {
+        const response = await fetch(`${API_URL}/${orderId}`, {
+          method: 'DELETE',
+          headers: { Authorization: getAuthHeader() },
+        });
+        if (!response.ok) {
+          const payload = await response.json().catch(() => ({}));
+          throw new Error(payload.error || `Falha ao excluir pedido (${response.status})`);
+        }
+        return response.json();
       }
 
       function showLogin() {
@@ -386,6 +485,7 @@
 
       function renderOrders(orders) {
         const container = document.getElementById('orders');
+        currentOrders = orders;
         document.getElementById('count').textContent = orders.length;
         document.getElementById('pendentes').textContent = orders.filter((o) => o.status === 'pendente').length;
         document.getElementById('total').textContent = formatCurrency(orders.reduce((sum, o) => sum + Number(o.total || 0), 0));
@@ -426,11 +526,48 @@
                   <span class="value">${formatCurrency(order.total)}</span>
                 </div>
               </div>
+              <div class="card-actions">
+                <button class="edit-order-button" data-id="${escapeHtml(order._id)}" data-idx="${idx}">Editar</button>
+                <button class="delete-order-button" data-id="${escapeHtml(order._id)}" data-idx="${idx}">Excluir</button>
+              </div>
               <button class="details-toggle" data-idx="${idx}">▾ Mais detalhes</button>
               <div class="order-details hidden" data-idx="${idx}">
                 <div><b>Pedido:</b> #${escapeHtml(String(order._id).slice(-6))}</div>
                 <div><b>Endereço:</b> ${escapeHtml(order.address || '—')}</div>
                 <div><b>Criado em:</b> ${escapeHtml(new Date(order.createdAt).toLocaleString('pt-BR'))}</div>
+                <div class="edit-panel hidden" data-idx="${idx}">
+                  <div class="edit-field">
+                    <label for="name-${idx}">Nome do cliente</label>
+                    <input id="name-${idx}" type="text" value="${escapeHtml(order.customerName || '')}" />
+                  </div>
+                  <div class="edit-field">
+                    <label for="phone-${idx}">Telefone / JID</label>
+                    <input id="phone-${idx}" type="text" value="${escapeHtml(order.customerJid || '')}" />
+                  </div>
+                  <div class="edit-field">
+                    <label for="address-${idx}">Endereço</label>
+                    <textarea id="address-${idx}" rows="2">${escapeHtml(order.address || '')}</textarea>
+                  </div>
+                  <div class="edit-field">
+                    <label for="status-${idx}">Status</label>
+                    <select id="status-${idx}">
+                      <option value="pendente" ${order.status === 'pendente' ? 'selected' : ''}>Pendente</option>
+                      <option value="confirmado" ${order.status === 'confirmado' ? 'selected' : ''}>Confirmado</option>
+                      <option value="entregue" ${order.status === 'entregue' ? 'selected' : ''}>Entregue</option>
+                      <option value="cancelado" ${order.status === 'cancelado' ? 'selected' : ''}>Cancelado</option>
+                    </select>
+                  </div>
+                  <div class="edit-field">
+                    <label for="total-${idx}">Total</label>
+                    <input id="total-${idx}" type="number" step="0.01" value="${Number(order.total || 0).toFixed(2)}" />
+                  </div>
+                  <div class="edit-actions">
+                    <button class="save-order-button" data-id="${escapeHtml(order._id)}" data-idx="${idx}">Salvar alterações</button>
+                    <button class="cancel-edit-button" type="button" data-idx="${idx}">Cancelar</button>
+                    <button class="delete-order-panel-button" type="button" data-id="${escapeHtml(order._id)}" data-idx="${idx}">Excluir pedido</button>
+                  </div>
+                  <div class="order-action-message" data-idx="${idx}"></div>
+                </div>
               </div>
             </article>
           `;
@@ -452,15 +589,77 @@
         loadPage();
       });
 
-      document.addEventListener('click', (event) => {
+      document.addEventListener('click', async (event) => {
         if (event.target.id === 'refresh') {
           loadOrders();
+          return;
         }
+
         if (event.target.classList.contains('details-toggle')) {
           const idx = event.target.dataset.idx;
           const panel = document.querySelector(`.order-details[data-idx="${idx}"]`);
           panel.classList.toggle('hidden');
           event.target.textContent = panel.classList.contains('hidden') ? '▾ Mais detalhes' : '▴ Menos detalhes';
+          return;
+        }
+
+        if (event.target.classList.contains('edit-order-button')) {
+          const idx = event.target.dataset.idx;
+          const orderDetail = document.querySelector(`.order-details[data-idx="${idx}"]`);
+          const editPanel = document.querySelector(`.edit-panel[data-idx="${idx}"]`);
+          orderDetail.classList.remove('hidden');
+          editPanel.classList.toggle('hidden');
+          return;
+        }
+
+        if (event.target.classList.contains('cancel-edit-button')) {
+          const idx = event.target.dataset.idx;
+          const editPanel = document.querySelector(`.edit-panel[data-idx="${idx}"]`);
+          if (editPanel) editPanel.classList.add('hidden');
+          return;
+        }
+
+        if (event.target.classList.contains('save-order-button')) {
+          const orderId = event.target.dataset.id;
+          const idx = event.target.dataset.idx;
+          const messageEl = document.querySelector(`.order-action-message[data-idx="${idx}"]`);
+          messageEl.textContent = 'Salvando...';
+
+          const updates = {
+            customerName: document.getElementById(`name-${idx}`).value.trim(),
+            customerJid: document.getElementById(`phone-${idx}`).value.trim(),
+            address: document.getElementById(`address-${idx}`).value.trim(),
+            status: document.getElementById(`status-${idx}`).value,
+            total: Number(document.getElementById(`total-${idx}`).value || 0),
+          };
+
+          try {
+            await patchOrder(orderId, updates);
+            await loadOrders();
+            messageEl.textContent = 'Pedido atualizado com sucesso.';
+          } catch (err) {
+            console.error(err);
+            messageEl.textContent = err.message;
+          }
+          return;
+        }
+
+        if (event.target.classList.contains('delete-order-button') || event.target.classList.contains('delete-order-panel-button')) {
+          const orderId = event.target.dataset.id;
+          const idx = event.target.dataset.idx;
+          const messageEl = document.querySelector(`.order-action-message[data-idx="${idx}"]`);
+          const confirmDelete = window.confirm('Deseja realmente excluir este pedido? Esta ação não pode ser desfeita.');
+          if (!confirmDelete) return;
+
+          if (messageEl) messageEl.textContent = 'Excluindo...';
+          try {
+            await deleteOrder(orderId);
+            await loadOrders();
+          } catch (err) {
+            console.error(err);
+            if (messageEl) messageEl.textContent = err.message;
+          }
+          return;
         }
       });
 
