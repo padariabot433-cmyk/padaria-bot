@@ -35,7 +35,7 @@ async function reply(sock, jid, text) {
   await sock.sendMessage(jid, { text });
 }
 
-export async function handleMessage(sock, jid, rawText, pushName) {
+export async function handleMessage(sock, jid, rawText, pushName, realPhoneJid) {
   const text = (rawText || '').trim();
   const lower = text.toLowerCase();
   const session = await getSession(jid);
@@ -169,8 +169,11 @@ export async function handleMessage(sock, jid, rawText, pushName) {
 
     case 'confirmacao': {
       if (lower === '1' || lower === 'confirmar') {
+        // Salva o telefone real quando disponível (evita o número "fantasma" do @lid)
+        const customerJid = realPhoneJid || jid;
+
         const order = await Order.create({
-          customerJid: jid,
+          customerJid,
           customerName: pushName || '',
           items: session.cart,
           total: cartTotal(session.cart),
@@ -191,7 +194,7 @@ export async function handleMessage(sock, jid, rawText, pushName) {
           await reply(
             sock,
             adminJid,
-            `🆕 *Novo pedido!*\n\n${cartSummaryText(session.cart)}\n\n📍 ${session.address}\n📱 Cliente: ${jid.split('@')[0]}`
+            `🆕 *Novo pedido!*\n\n${cartSummaryText(session.cart)}\n\n📍 ${session.address}\n📱 Cliente: ${customerJid.split('@')[0]}`
           );
         }
 

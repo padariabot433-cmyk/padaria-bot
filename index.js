@@ -190,6 +190,11 @@ async function startBot() {
       const jid = msg.key.remoteJid;
       if (jid === 'status@broadcast' || jid.endsWith('@g.us')) continue;
 
+      // Quando o remetente usa @lid (id anônimo do WhatsApp), o Baileys às vezes
+      // traz o telefone real nesse campo alternativo. Usamos ele só pra exibir/
+      // salvar o contato — a resposta continua indo pro "jid" original (@lid).
+      const realPhoneJid = msg.key.remoteJidAlt || jid;
+
       const text =
         msg.message.conversation ||
         msg.message.extendedTextMessage?.text ||
@@ -199,7 +204,7 @@ async function startBot() {
       if (!text) continue;
 
       try {
-        await handleMessage(sock, jid, text, msg.pushName);
+        await handleMessage(sock, jid, text, msg.pushName, realPhoneJid);
       } catch (err) {
         console.error('Erro ao processar mensagem:', err);
         await sock.sendMessage(jid, {
