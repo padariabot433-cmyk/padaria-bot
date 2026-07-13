@@ -106,7 +106,12 @@
       .order-card.status-entregue { border-left-color: var(--accent-2); }
       .order-card.status-cancelado { border-left-color: #aaa; opacity: 0.65; }
       .order-card.status-pendente,
-      .order-card.status-confirmado { border-left-color: var(--accent); }
+      .order-card.status-confirmado,
+      .order-card.status-devendo,
+      .order-card.status-ok { border-left-color: var(--accent); }
+
+      .status-pendente .status, .status-confirmado .status { background: #f4e1d8; color: var(--accent); }
+      .status-devendo .status, .status-ok .status { background: #f4e1d8; color: var(--accent); }
 
       .order-top {
         display: flex;
@@ -320,10 +325,22 @@
         .card-actions {
           padding: 0 1.1rem 1rem;
         }
+        .status-actions {
+          display: flex;
+          gap: 0.5rem;
+          flex-wrap: wrap;
+          padding: 0 1.1rem 0.75rem;
+        }
+        .status-button,
         .card-actions button,
         .edit-actions button {
           flex: 1 1 100%;
           width: 100%;
+        }
+        .status-button {
+          background: #f4e1d8;
+          color: var(--accent);
+          border: 1px solid rgba(168,68,46,0.25);
         }
         .edit-field input,
         .edit-field textarea,
@@ -385,6 +402,8 @@
           <select id="status">
             <option value="">Todos</option>
             <option value="pendente">Pendente</option>
+            <option value="devendo">Devendo</option>
+            <option value="ok">Ok</option>
             <option value="confirmado">Confirmado</option>
             <option value="entregue">Entregue</option>
             <option value="cancelado">Cancelado</option>
@@ -414,6 +433,14 @@
     <script>
       const API_URL = 'https://padaria-bot-cbf7.onrender.com/api/orders';
       let currentOrders = [];
+      const STATUS_LABELS = {
+        pendente: 'Pendente',
+        devendo: 'Devendo',
+        ok: 'Ok',
+        confirmado: 'Confirmado',
+        entregue: 'Entregue',
+        cancelado: 'Cancelado',
+      };
 
       function getAuthHeader() {
         const pass = sessionStorage.getItem('painelSenha');
@@ -568,6 +595,7 @@
             const qty = item.quantity === 1 ? '1 pacote' : `${item.quantity} pacotes`;
             return `<li><span>${escapeHtml(`${qty} de ${item.name}`)}</span><span>${formatCurrency(item.price * item.quantity)}</span></li>`;
           }).join('') || '';
+          const statusLabel = STATUS_LABELS[order.status] || escapeHtml(order.status);
 
           return `
             <article class="order-card status-${escapeHtml(order.status)}">
@@ -577,7 +605,7 @@
                   <div class="order-name">${name}</div>
                   <div class="order-phone">📱 ${escapeHtml(formatPhone(order.customerJid))}</div>
                 </div>
-                <span class="status">${escapeHtml(order.status)}</span>
+                <span class="status">${escapeHtml(statusLabel)}</span>
               </div>
               <div class="order-body">
                 <ul class="order-items">${items}</ul>
@@ -585,6 +613,11 @@
                   <span class="label">Total do pedido</span>
                   <span class="value">${formatCurrency(order.total)}</span>
                 </div>
+              </div>
+              <div class="status-actions">
+                <button class="status-button" type="button" data-id="${escapeHtml(order._id)}" data-idx="${idx}" data-status="pendente">Pendente</button>
+                <button class="status-button" type="button" data-id="${escapeHtml(order._id)}" data-idx="${idx}" data-status="devendo">Devendo</button>
+                <button class="status-button" type="button" data-id="${escapeHtml(order._id)}" data-idx="${idx}" data-status="ok">Ok</button>
               </div>
               <div class="card-actions">
                 <button class="edit-order-button" data-id="${escapeHtml(order._id)}" data-idx="${idx}">Editar</button>
@@ -607,6 +640,8 @@
                     <label for="status-${idx}">Status</label>
                     <select id="status-${idx}">
                       <option value="pendente" ${order.status === 'pendente' ? 'selected' : ''}>Pendente</option>
+                      <option value="devendo" ${order.status === 'devendo' ? 'selected' : ''}>Devendo</option>
+                      <option value="ok" ${order.status === 'ok' ? 'selected' : ''}>Ok</option>
                       <option value="confirmado" ${order.status === 'confirmado' ? 'selected' : ''}>Confirmado</option>
                       <option value="entregue" ${order.status === 'entregue' ? 'selected' : ''}>Entregue</option>
                       <option value="cancelado" ${order.status === 'cancelado' ? 'selected' : ''}>Cancelado</option>
@@ -671,6 +706,24 @@
           const idx = event.target.dataset.idx;
           const editPanel = document.querySelector(`.edit-panel[data-idx="${idx}"]`);
           if (editPanel) editPanel.classList.add('hidden');
+          return;
+        }
+
+        if (event.target.classList.contains('status-button')) {
+          const orderId = event.target.dataset.id;
+          const idx = event.target.dataset.idx;
+          const status = event.target.dataset.status;
+          const messageEl = document.querySelector(`.order-action-message[data-idx="${idx}"]`);
+          if (messageEl) messageEl.textContent = 'Atualizando status...';
+
+          try {
+            await patchOrder(orderId, { status });
+            await loadOrders();
+            if (messageEl) messageEl.textContent = 'Status atualizado.';
+          } catch (err) {
+            console.error(err);
+            if (messageEl) messageEl.textContent = err.message;
+          }
           return;
         }
 

@@ -14,6 +14,7 @@ import { adminAuth } from './src/adminAuth.js';
 import { adminRouter } from './src/adminRoutes.js';
 import { startDailyReminder } from './src/dailyReminder.js';
 import { startWeeklyBackup } from './src/backup.js';
+import { createBotInstanceId, acquireBotLock, refreshBotLock, releaseBotLock } from './src/botLock.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
@@ -49,6 +50,9 @@ app.use((req, res, next) => {
 
 let latestQR = null;
 let connectionStatus = 'iniciando';
+const botInstanceId = createBotInstanceId();
+let botLockRefresh = null;
+let hasBotLock = false;
 
 // Serve a página de redirecionamento (index.html da raiz)
 app.get('/', (req, res) => {
@@ -108,7 +112,7 @@ app.patch('/api/orders/:id', adminAuth, async (req, res) => {
       }
     }
 
-    if (updates.status && !['pendente', 'confirmado', 'entregue', 'cancelado'].includes(updates.status)) {
+    if (updates.status && !['pendente', 'devendo', 'ok', 'confirmado', 'entregue', 'cancelado'].includes(updates.status)) {
       return res.status(400).json({ error: 'Status inválido.' });
     }
 
@@ -177,6 +181,27 @@ let reminderStarted = false;
 async function startBot() {
   await connectDB();
 
+  hasBotLock = await acquireBotLock(botInstanceId);
+  if (!hasBotLock) {
+    console.log('⚠️ Outra instância do bot já está ativa. Esta instância não iniciará o WhatsApp para evitar conflito de sessão.');
+    connectionStatus = 'desconectado';
+    return;
+  }
+
+  botLockRefresh = setInterval(async () => {
+    try {
+      const refreshed = await refreshBotLock(botInstanceId);
+      if (!refreshed) {
+        console.log('⚠️ O lock do bot WhatsApp foi perdido. Esta instância vai parar.');
+        clearInterval(botLockRefresh);
+        botLockRefresh = null;
+        hasBotLock = false;
+      }
+    } catch (err) {
+      console.error('Erro ao atualizar lock do bot:', err);
+    }
+  }, 10_000);
+
   const { state, saveCreds } = await useMongoAuthState();
   const { version } = await fetchLatestBaileysVersion();
 
@@ -208,6 +233,14 @@ async function startBot() {
       console.log('Conexão fechada.', statusCode, 'Reconectar?', shouldReconnect);
 
       if (isConflict) {
+        if (botLockRefresh) {
+          clearInterval(botLockRefresh);
+          botLockRefresh = null;
+        }
+        if (hasBotLock) {
+          await releaseBotLock(botInstanceId);
+          hasBotLock = false;
+        }
         console.log(
           '⚠️ Sessão substituída por outra conexão (provavelmente duas instâncias rodando ao mesmo tempo). ' +
           'Esta instância vai parar de tentar reconectar.'
@@ -215,11 +248,20 @@ async function startBot() {
         return;
       }
 
-      if (shouldReconnect) {
-        setTimeout(() => startBot(), 3000);
-      } else {
+      if (!shouldReconnect) {
+        if (botLockRefresh) {
+          clearInterval(botLockRefresh);
+          botLockRefresh = null;
+        }
+        if (hasBotLock) {
+          await releaseBotLock(botInstanceId);
+          hasBotLock = false;
+        }
         console.log('Sessão encerrada (logout). Apague o auth no MongoDB para gerar novo QR.');
+        return;
       }
+
+      setTimeout(() => startBot(), 3000);
     } else if (connection === 'open') {
       connectionStatus = 'conectado';
       latestQR = null;
@@ -234,13 +276,23 @@ async function startBot() {
   });
 
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
+    console.log(`📩 messages.upsert disparado. type: ${type}, quantidade: ${messages.length}`);
+
     if (type !== 'notify') return;
 
     for (const msg of messages) {
-      if (!msg.message || msg.key.fromMe) continue;
+      console.log(`   → mensagem de ${msg.key.remoteJid}, fromMe: ${msg.key.fromMe}, tem conteúdo: ${!!msg.message}`);
+
+      if (!msg.message || msg.key.fromMe) {
+        console.log('   → ignorada (sem conteúdo ou é mensagem própria)');
+        continue;
+      }
 
       const jid = msg.key.remoteJid;
-      if (jid === 'status@broadcast' || jid.endsWith('@g.us')) continue;
+      if (jid === 'status@broadcast' || jid.endsWith('@g.us')) {
+        console.log('   → ignorada (status ou grupo)');
+        continue;
+      }
 
       // Quando o remetente usa @lid (id anônimo do WhatsApp), o Baileys às vezes
       // traz o telefone real nesse campo alternativo. Usamos ele só pra exibir/
@@ -277,4 +329,16 @@ process.on('uncaughtException', (err) => {
 startBot().catch((err) => {
   console.error('Erro fatal ao iniciar o bot:', err);
   process.exit(1);
+});
+
+process.on('SIGINT', async () => {
+  if (botLockRefresh) {
+    clearInterval(botLockRefresh);
+    botLockRefresh = null;
+  }
+  if (hasBotLock) {
+    await releaseBotLock(botInstanceId);
+    hasBotLock = false;
+  }
+  process.exit(0);
 });

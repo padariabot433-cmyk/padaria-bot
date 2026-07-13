@@ -6,6 +6,8 @@ export const adminRouter = express.Router();
 
 const STATUS_LABELS = {
   pendente: 'Pendente',
+  devendo: 'Devendo',
+  ok: 'Ok',
   confirmado: 'Confirmado',
   entregue: 'Entregue',
   cancelado: 'Cancelado',
@@ -237,7 +239,7 @@ adminRouter.get('/', async (req, res) => {
 
 adminRouter.post('/:id/status', async (req, res) => {
   const { status } = req.body;
-  if (!['entregue', 'cancelado', 'pendente'].includes(status)) {
+  if (!['pendente', 'devendo', 'ok', 'confirmado', 'entregue', 'cancelado'].includes(status)) {
     return res.status(400).send('Status inválido');
   }
   await Order.updateOne({ _id: req.params.id }, { $set: { status } });
