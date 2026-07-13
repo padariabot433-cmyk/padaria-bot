@@ -22,7 +22,7 @@ app.get('/', (req, res) => {
 });
 
 // Painel de pedidos, protegido por senha (ADMIN_PASSWORD no .env)
-app.use(adminAuth, adminRouter);
+app.use('/pedidos', adminAuth, adminRouter);
 
 // Página simples para escanear o QR code sem precisar olhar o terminal
 app.get('/qr', async (req, res) => {

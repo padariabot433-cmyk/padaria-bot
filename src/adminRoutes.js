@@ -215,7 +215,7 @@ function pageHTML({ orders, dateLabel, totalHoje, pendentes }) {
 </html>`;
 }
 
-adminRouter.get('/pedidos', async (req, res) => {
+adminRouter.get('/', async (req, res) => {
   const today = new Date();
   const orders = await Order.find({
     createdAt: { $gte: startOfDay(today), $lte: endOfDay(today) },
@@ -235,7 +235,7 @@ adminRouter.get('/pedidos', async (req, res) => {
   res.send(pageHTML({ orders, dateLabel, totalHoje, pendentes }));
 });
 
-adminRouter.post('/pedidos/:id/status', async (req, res) => {
+adminRouter.post('/:id/status', async (req, res) => {
   const { status } = req.body;
   if (!['entregue', 'cancelado', 'pendente'].includes(status)) {
     return res.status(400).send('Status inválido');
