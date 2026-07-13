@@ -201,7 +201,7 @@
       .order-details b { color: var(--text); }
 
       .muted { color: var(--muted); }
-      .hidden { display: none; }
+      .hidden { display: none !important; }
       .empty {
         text-align: center;
         color: var(--muted);
@@ -318,30 +318,25 @@
       }
 
       async function loadOrders(isLoginAttempt = false) {
-  alert('1) loadOrders começou');
+        const day = document.getElementById('day').value;
+        const status = document.getElementById('status').value;
+        const url = new URL(API_URL);
+        if (day) url.searchParams.set('day', day);
+        if (status) url.searchParams.set('status', status);
 
-  const day = document.getElementById('day').value;
-  const status = document.getElementById('status').value;
-  const url = new URL(API_URL);
-  if (day) url.searchParams.set('day', day);
-  if (status) url.searchParams.set('status', status);
+        const errorEl = document.getElementById('loginError');
+        if (isLoginAttempt) errorEl.textContent = 'Verificando...';
 
-  const errorEl = document.getElementById('loginError');
-  if (isLoginAttempt) errorEl.textContent = 'Verificando...';
-
-  let response;
-  try {
-    alert('2) antes do fetch');
-    response = await fetch(url, {
-      headers: { Authorization: getAuthHeader() },
-    });
-    alert('3) fetch respondeu, status: ' + response.status);
-  } catch (err) {
-    alert('ERRO no fetch: ' + err.message);
-    errorEl.textContent = 'Não foi possível conectar ao servidor. Verifique sua internet e tente de novo.';
-    console.error('Erro de rede ao buscar pedidos:', err);
-    return;
-  }
+        let response;
+        try {
+          response = await fetch(url, {
+            headers: { Authorization: getAuthHeader() },
+          });
+        } catch (err) {
+          errorEl.textContent = 'Não foi possível conectar ao servidor. Verifique sua internet e tente de novo.';
+          console.error('Erro de rede ao buscar pedidos:', err);
+          return;
+        }
 
         if (response.status === 401) {
           sessionStorage.removeItem('painelSenha');
@@ -366,11 +361,8 @@
         if (isLoginAttempt) errorEl.textContent = '';
 
         const orders = await response.json();
-    alert('4) recebeu ' + orders.length + ' pedidos, vou renderizar');
-    renderOrders(orders);
-    alert('5) renderizou, vou mostrar o app');
-    showApp();
-    alert('6) showApp chamado');
+        renderOrders(orders);
+        showApp();
       }
 
       function formatCurrency(value) {
