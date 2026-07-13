@@ -36,6 +36,15 @@ const orderSchema = new mongoose.Schema({
 
 export const Order = mongoose.model('Order', orderSchema);
 
+const customerSchema = new mongoose.Schema({
+  jid: { type: String, required: true, unique: true },
+  name: String,
+  address: String,
+  updatedAt: { type: Date, default: Date.now },
+});
+
+export const Customer = mongoose.model('Customer', customerSchema);
+
 const pendingItemSchema = new mongoose.Schema(
   { id: Number, name: String, price: Number },
   { _id: false }
@@ -47,6 +56,7 @@ const sessionSchema = new mongoose.Schema(
     step: { type: String, default: 'inicio' },
     cart: [orderItemSchema],
     address: String,
+    customerName: String,
     pendingItems: [pendingItemSchema],
     pendingIndex: Number,
     updatedAt: { type: Date, default: Date.now },

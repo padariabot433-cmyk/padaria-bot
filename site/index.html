@@ -61,6 +61,10 @@
         font-family: inherit;
         font-size: 0.9rem;
       }
+      input, select {
+        min-width: 180px;
+        flex: 1;
+      }
       button {
         cursor: pointer;
         background: var(--accent);
@@ -109,6 +113,7 @@
         align-items: center;
         gap: 0.8rem;
         padding: 1rem 1.1rem 0.7rem;
+        flex-wrap: wrap;
       }
       .avatar {
         width: 42px;
@@ -216,6 +221,15 @@
         transition: transform 0.15s ease, background 0.15s ease;
       }
       .card-actions button:hover { transform: translateY(-1px); }
+      .card-actions {
+        display: flex;
+        gap: 0.6rem;
+        flex-wrap: wrap;
+        padding: 0 1.1rem 1rem;
+      }
+      .card-actions button {
+        flex: 1 1 140px;
+      }
       .edit-order-button { border-color: var(--accent); color: var(--accent); }
       .delete-order-button { border-color: #b43728; color: #b43728; }
 
@@ -273,6 +287,52 @@
         color: var(--muted);
         padding: 3rem 0;
         grid-column: 1 / -1;
+      }
+
+      @media (max-width: 720px) {
+        main {
+          margin-top: 0;
+          padding: 0 1rem 2.5rem;
+        }
+        .controls {
+          padding: 0.85rem;
+          gap: 0.65rem;
+        }
+        .controls input,
+        .controls select,
+        .controls button {
+          min-width: 100%;
+          flex: 1 1 100%;
+        }
+        .summary {
+          grid-template-columns: 1fr;
+        }
+        .order-card {
+          border-radius: 14px;
+        }
+        .order-top {
+          align-items: flex-start;
+        }
+        .order-name,
+        .order-phone {
+          width: 100%;
+        }
+        .card-actions {
+          padding: 0 1.1rem 1rem;
+        }
+        .card-actions button,
+        .edit-actions button {
+          flex: 1 1 100%;
+          width: 100%;
+        }
+        .edit-field input,
+        .edit-field textarea,
+        .edit-field select {
+          font-size: 0.95rem;
+        }
+        .details-toggle {
+          font-size: 0.9rem;
+        }
       }
 
       .login-screen {
@@ -533,7 +593,6 @@
               <button class="details-toggle" data-idx="${idx}">▾ Mais detalhes</button>
               <div class="order-details hidden" data-idx="${idx}">
                 <div><b>Pedido:</b> #${escapeHtml(String(order._id).slice(-6))}</div>
-                <div><b>Endereço:</b> ${escapeHtml(order.address || '—')}</div>
                 <div><b>Criado em:</b> ${escapeHtml(new Date(order.createdAt).toLocaleString('pt-BR'))}</div>
                 <div class="edit-panel hidden" data-idx="${idx}">
                   <div class="edit-field">
@@ -543,10 +602,6 @@
                   <div class="edit-field">
                     <label for="phone-${idx}">Telefone / JID</label>
                     <input id="phone-${idx}" type="text" value="${escapeHtml(order.customerJid || '')}" />
-                  </div>
-                  <div class="edit-field">
-                    <label for="address-${idx}">Endereço</label>
-                    <textarea id="address-${idx}" rows="2">${escapeHtml(order.address || '')}</textarea>
                   </div>
                   <div class="edit-field">
                     <label for="status-${idx}">Status</label>
@@ -628,7 +683,6 @@
           const updates = {
             customerName: document.getElementById(`name-${idx}`).value.trim(),
             customerJid: document.getElementById(`phone-${idx}`).value.trim(),
-            address: document.getElementById(`address-${idx}`).value.trim(),
             status: document.getElementById(`status-${idx}`).value,
             total: Number(document.getElementById(`total-${idx}`).value || 0),
           };

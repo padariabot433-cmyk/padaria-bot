@@ -1,5 +1,5 @@
 import { MENU, findItem, buildMenuText, formatMoney } from './menu.js';
-import { Order, Session } from './db.js';
+import { Order, Session, Customer } from './db.js';
 
 function cartTotal(cart) {
   return cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -14,11 +14,34 @@ function cartSummaryText(cart) {
 }
 
 // Sessão agora vive no MongoDB — sobrevive a reinícios do bot
+async function getCustomer(jid) {
+  return Customer.findOne({ jid });
+}
+
+async function upsertCustomer({ jid, name, address }) {
+  if (!jid) return null;
+  return Customer.findOneAndUpdate(
+    { jid },
+    { name, address, updatedAt: new Date() },
+    { upsert: true, new: true }
+  );
+}
+
 async function getSession(jid) {
   let session = await Session.findOne({ jid });
   if (!session) {
-    session = await Session.create({ jid, step: 'inicio', cart: [], address: null });
+    session = await Session.create({ jid, step: 'inicio', cart: [], address: null, customerName: '' });
   }
+
+  if (!session.address) {
+    const customer = await getCustomer(jid);
+    if (customer) {
+      if (customer.address) session.address = customer.address;
+      if (customer.name) session.customerName = customer.name;
+      await saveSession(session);
+    }
+  }
+
   return session;
 }
 
@@ -154,7 +177,12 @@ export async function handleMessage(sock, jid, rawText, pushName, realPhoneJid) 
     }
 
     case 'endereco': {
-      session.address = text;
+      if (!session.customerName && pushName) {
+        session.customerName = pushName;
+      }
+      if (text.toLowerCase() !== 'mesmo' || !session.address) {
+        session.address = text;
+      }
       session.step = 'confirmacao';
       await saveSession(session);
       await reply(
@@ -162,23 +190,31 @@ export async function handleMessage(sock, jid, rawText, pushName, realPhoneJid) 
         jid,
         `*Confirme seu pedido:*\n\n${cartSummaryText(session.cart)}\n\n` +
           `📍 Endereço: ${session.address}\n\n` +
-          'Digite *1* para confirmar ou *2* para cancelar.'
+          'Digite *1* para confirmar ou *2* para cancelar. Se quiser alterar o endereço, digite-o novamente.'
       );
       break;
     }
 
     case 'confirmacao': {
-      if (lower === '1' || lower === 'confirmar') {
-        // Salva o telefone real quando disponível (evita o número "fantasma" do @lid)
+      const isConfirm = lower === '1' || lower === 'confirmar';
+      const isCancel = lower === '2' || lower === 'cancelar';
+
+      if (isConfirm) {
         const customerJid = realPhoneJid || jid;
 
         const order = await Order.create({
           customerJid,
-          customerName: pushName || '',
+          customerName: session.customerName || pushName || '',
           items: session.cart,
           total: cartTotal(session.cart),
           address: session.address,
           status: 'pendente',
+        });
+
+        const customer = await upsertCustomer({
+          jid: customerJid,
+          name: session.customerName || pushName || '',
+          address: session.address,
         });
 
         await reply(
