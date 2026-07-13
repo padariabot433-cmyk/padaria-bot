@@ -17,9 +17,9 @@ import { startWeeklyBackup } from './src/backup.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
-const ALLOWED_ORIGIN = process.env.SITE_ORIGIN || 'https://padariabot433-cmyk.github.io';
 const app = express();
 
+// Só avisa no log — não bloqueia o app, mas ajuda a evitar senha fácil de adivinhar
 function checkPasswordStrength(password) {
   if (!password) return;
   const isWeak = password.length < 8 || /^(123456|senha|padaria|admin|password)$/i.test(password);
@@ -28,8 +28,15 @@ function checkPasswordStrength(password) {
   }
 }
 checkPasswordStrength(process.env.ADMIN_PASSWORD);
+
 app.use(express.urlencoded({ extended: true })); // para ler os formulários do painel
 app.use(express.json());
+
+// CORS restrito: só o domínio do painel (GitHub Pages) pode chamar a API.
+// Isso PRECISA vir antes de qualquer rota, pra responder o preflight (OPTIONS)
+// com os headers certos independentemente de senha/autenticação.
+const ALLOWED_ORIGIN = process.env.SITE_ORIGIN || 'https://padariabot433-cmyk.github.io';
+
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', ALLOWED_ORIGIN);
   res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -42,14 +49,14 @@ app.use((req, res, next) => {
 
 let latestQR = null;
 let connectionStatus = 'iniciando';
-let reminderStarted = false;
 
 // Serve a página de redirecionamento (index.html da raiz)
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Serve o painel protegido pela mesma senha do /pedidos
+// Serve o painel (header.html, controls.html, summary.html, index.html)
+// protegido pela mesma senha do /pedidos
 app.use('/site', adminAuth, express.static(path.join(__dirname, 'site')));
 
 // Status simples do bot
@@ -113,6 +120,8 @@ app.listen(PORT, () => {
   console.log(`🌐 Servidor HTTP rodando na porta ${PORT}`);
 });
 
+let reminderStarted = false;
+
 async function startBot() {
   await connectDB();
 
@@ -141,9 +150,6 @@ async function startBot() {
       connectionStatus = 'desconectado';
       const statusCode = lastDisconnect?.error?.output?.statusCode;
 
-      // 440 = connectionReplaced: outra instância conectou com a MESMA sessão
-      // (ex: deploy novo subindo antes do antigo desligar). Reconectar aqui só
-      // alimenta um cabo de guerra infinito entre as duas instâncias.
       const isConflict = statusCode === DisconnectReason.connectionReplaced;
       const shouldReconnect = statusCode !== DisconnectReason.loggedOut && !isConflict;
 
@@ -158,7 +164,6 @@ async function startBot() {
       }
 
       if (shouldReconnect) {
-        // Pequeno atraso evita um loop de reconexão imediato e agressivo
         setTimeout(() => startBot(), 3000);
       } else {
         console.log('Sessão encerrada (logout). Apague o auth no MongoDB para gerar novo QR.');
@@ -183,7 +188,6 @@ async function startBot() {
       if (!msg.message || msg.key.fromMe) continue;
 
       const jid = msg.key.remoteJid;
-      // Ignora mensagens de grupos e do próprio status
       if (jid === 'status@broadcast' || jid.endsWith('@g.us')) continue;
 
       const text =
@@ -206,9 +210,6 @@ async function startBot() {
   });
 }
 
-// Erros vindos de dentro do Baileys (ex: timeout ao renovar pré-chaves) às vezes
-// escapam de qualquer try/catch nosso e, sem isso aqui, derrubam o processo inteiro
-// (o que faz o Render reiniciar o serviço e recomeçar o ciclo de conflito de sessão).
 process.on('unhandledRejection', (err) => {
   console.error('⚠️ Erro não tratado (unhandledRejection), ignorando para manter o bot no ar:', err);
 });
