@@ -62,6 +62,47 @@
         display: grid;
         gap: 1rem;
       }
+      .login-screen {
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 1.5rem;
+      }
+      .login-card {
+        width: min(100%, 420px);
+        background: var(--card);
+        border-radius: 20px;
+        padding: 2rem;
+        box-shadow: 0 12px 40px rgba(62, 39, 35, 0.12);
+      }
+      .login-card h2 {
+        margin: 0 0 0.4rem;
+        font-size: 1.5rem;
+      }
+      .login-card p {
+        margin: 0 0 1rem;
+        color: var(--muted);
+      }
+      .login-form {
+        display: grid;
+        gap: 0.8rem;
+      }
+      .login-form input {
+        width: 100%;
+      }
+      .login-form button {
+        width: 100%;
+        padding: 0.85rem;
+        font-weight: 700;
+      }
+      .login-error {
+        color: var(--accent);
+        font-size: 0.9rem;
+        min-height: 1.2rem;
+      }
+      .hidden {
+        display: none;
+      }
       .order-card {
         background: var(--card);
         padding: 1rem;
@@ -85,24 +126,49 @@
     </style>
   </head>
   <body>
-    <div id="header"></div>
+    <div id="loginScreen" class="login-screen">
+      <div class="login-card">
+        <h2>🔐 Acesso ao painel</h2>
+        <p>Digite a senha para ver os pedidos da padaria.</p>
+        <form id="loginForm" class="login-form">
+          <input id="senhaInput" type="password" placeholder="Senha do painel" autocomplete="current-password" />
+          <button type="submit">Entrar</button>
+          <div id="loginError" class="login-error"></div>
+        </form>
+      </div>
+    </div>
 
-    <main>
-      <div id="controls"></div>
-      <div id="summary"></div>
-      <div id="orders" class="orders"></div>
-    </main>
+    <div id="appContent" class="hidden">
+      <div id="header"></div>
+
+      <main>
+        <div id="controls"></div>
+        <div id="summary"></div>
+        <div id="orders" class="orders"></div>
+      </main>
+    </div>
 
     <script>
       const API_URL = 'https://padaria-bot.onrender.com/api/orders';
 
       function getAuthHeader() {
-        let pass = sessionStorage.getItem('painelSenha');
-        if (!pass) {
-          pass = prompt('Digite a senha do painel:');
-          if (pass) sessionStorage.setItem('painelSenha', pass);
-        }
+        const pass = sessionStorage.getItem('painelSenha');
         return 'Basic ' + btoa('padaria:' + (pass || ''));
+      }
+
+      function showLogin() {
+        document.getElementById('loginScreen').classList.remove('hidden');
+        document.getElementById('appContent').classList.add('hidden');
+      }
+
+      function showApp() {
+        document.getElementById('loginScreen').classList.add('hidden');
+        document.getElementById('appContent').classList.remove('hidden');
+      }
+
+      function tryLogin(password) {
+        sessionStorage.setItem('painelSenha', password);
+        return loadOrders(true);
       }
 
       async function loadPartial(file, targetId) {
@@ -117,10 +183,17 @@
           loadPartial('controls.html', 'controls'),
           loadPartial('summary.html', 'summary')
         ]);
-        loadOrders();
+
+        const storedPassword = sessionStorage.getItem('painelSenha');
+        if (storedPassword) {
+          showApp();
+          return loadOrders();
+        }
+
+        showLogin();
       }
 
-      async function loadOrders() {
+      async function loadOrders(isLoginAttempt = false) {
         const day = document.getElementById('day').value;
         const status = document.getElementById('status').value;
         const url = new URL(API_URL);
@@ -133,12 +206,17 @@
 
         if (response.status === 401) {
           sessionStorage.removeItem('painelSenha');
-          alert('Senha incorreta.');
+          if (isLoginAttempt) {
+            document.getElementById('loginError').textContent = 'Senha incorreta. Tente novamente.';
+          } else {
+            showLogin();
+          }
           return;
         }
 
         const orders = await response.json();
         renderOrders(orders);
+        showApp();
       }
 
       function formatCurrency(value) {
@@ -171,6 +249,17 @@
           `;
         }).join('');
       }
+
+      document.getElementById('loginForm').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const password = document.getElementById('senhaInput').value;
+        document.getElementById('loginError').textContent = '';
+        if (!password) {
+          document.getElementById('loginError').textContent = 'Digite a senha.';
+          return;
+        }
+        await tryLogin(password);
+      });
 
       document.addEventListener('DOMContentLoaded', loadPage);
       document.addEventListener('click', (event) => {
