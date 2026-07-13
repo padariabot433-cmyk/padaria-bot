@@ -439,18 +439,20 @@
         }).join('');
       }
 
-      document.getElementById('loginForm').addEventListener('submit', async (event) => {
-        event.preventDefault();
-        const password = document.getElementById('senhaInput').value;
-        document.getElementById('loginError').textContent = '';
-        if (!password) {
-          document.getElementById('loginError').textContent = 'Digite a senha.';
-          return;
-        }
-        await tryLogin(password);
-      });
+      document.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('loginForm').addEventListener('submit', async (event) => {
+          event.preventDefault();
+          const password = document.getElementById('senhaInput').value;
+          document.getElementById('loginError').textContent = '';
+          if (!password) {
+            document.getElementById('loginError').textContent = 'Digite a senha.';
+            return;
+          }
+          await tryLogin(password);
+        });
 
-      document.addEventListener('DOMContentLoaded', loadPage);
+        loadPage();
+      });
 
       document.addEventListener('click', (event) => {
         if (event.target.id === 'refresh') {
