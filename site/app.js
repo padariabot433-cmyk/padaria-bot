@@ -2,6 +2,7 @@ const API_URL = 'https://padaria-bot-cbf7.onrender.com/api/orders';
 const API_MENU_URL = 'https://padaria-bot-cbf7.onrender.com/api/menu';
 let currentOrders = [];
 let currentMenu = [];
+let newOrderItems = [];
 let knownOrderIds = new Set();
 let hasPolledOnce = false;
 let pollInterval = null;
@@ -94,6 +95,197 @@ function renderMenu() {
       </div>
     `)
     .join('');
+}
+
+function populateNewOrderItemSelect() {
+  const select = document.getElementById('newOrderItemSelect');
+  if (!select) return;
+
+  const activeItems = currentMenu.filter((item) => item.active);
+  select.innerHTML = activeItems
+    .map((item) => `<option value="${item.id}">${escapeHtmlGlobal(item.name)} — ${formatCurrency(item.price)}</option>`)
+    .join('');
+}
+
+async function openNewOrderModal() {
+  newOrderItems = [];
+  document.getElementById('newOrderForm').reset();
+  document.getElementById('newOrderMessage').textContent = '';
+  renderNewOrderItemsList();
+
+  if (!currentMenu.length) {
+    await loadMenu();
+  }
+  populateNewOrderItemSelect();
+
+  document.getElementById('newOrderModal').classList.remove('hidden');
+}
+
+function closeNewOrderModal() {
+  document.getElementById('newOrderModal').classList.add('hidden');
+}
+
+function addItemToNewOrder() {
+  const select = document.getElementById('newOrderItemSelect');
+  const qtyInput = document.getElementById('newOrderItemQty');
+  const menuId = Number(select.value);
+  const qty = Number(qtyInput.value) || 1;
+
+  const menuItem = currentMenu.find((item) => item.id === menuId);
+  if (!menuItem) {
+    alert('Selecione um item válido do cardápio.');
+    return;
+  }
+
+  const existing = newOrderItems.find((item) => item.productId === menuId);
+  if (existing) {
+    existing.quantity += qty;
+  } else {
+    newOrderItems.push({
+      productId: menuItem.id,
+      name: menuItem.name,
+      price: menuItem.price,
+      quantity: qty,
+    });
+  }
+
+  qtyInput.value = 1;
+  renderNewOrderItemsList();
+}
+
+function removeItemFromNewOrder(index) {
+  newOrderItems.splice(index, 1);
+  renderNewOrderItemsList();
+}
+
+function renderNewOrderItemsList() {
+  const list = document.getElementById('newOrderItemsList');
+  const totalDisplay = document.getElementById('newOrderTotalDisplay');
+
+  if (!newOrderItems.length) {
+    list.innerHTML = '<li class="muted">Nenhum item adicionado ainda.</li>';
+  } else {
+    list.innerHTML = newOrderItems.map((item, idx) => `
+      <li>
+        <span>${escapeHtmlGlobal(`${item.quantity}x ${item.name}`)}</span>
+        <span>
+          ${formatCurrency(item.price * item.quantity)}
+          <button type="button" class="remove-new-order-item" data-remove-idx="${idx}" title="Remover">✕</button>
+        </span>
+      </li>
+    `).join('');
+  }
+
+  const total = newOrderItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  totalDisplay.textContent = formatCurrency(total);
+}
+
+async function submitNewOrder(event) {
+  event.preventDefault();
+  const messageEl = document.getElementById('newOrderMessage');
+
+  if (!newOrderItems.length) {
+    messageEl.textContent = 'Adicione ao menos um item ao pedido.';
+    return;
+  }
+
+  const payload = {
+    customerName: document.getElementById('newOrderName').value.trim(),
+    customerJid: document.getElementById('newOrderPhone').value.trim(),
+    status: document.getElementById('newOrderStatus').value,
+    valorPago: Number(document.getElementById('newOrderValorPago').value || 0),
+    items: newOrderItems,
+  };
+
+  messageEl.textContent = 'Criando pedido...';
+
+  try {
+    const response = await fetch(API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: getAuthHeader(),
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errPayload = await response.json().catch(() => ({}));
+      throw new Error(errPayload.error || `Falha ao criar pedido (${response.status})`);
+    }
+
+    closeNewOrderModal();
+    await loadOrders();
+  } catch (err) {
+    console.error(err);
+    messageEl.textContent = err.message;
+  }
+}
+
+function exportOrdersToPdf() {
+  const orders = currentOrders;
+  if (!orders.length) {
+    alert('Não há pedidos para exportar.');
+    return;
+  }
+
+  const rowsHtml = orders.map((order) => {
+    const items = (order.items || []).map((item) => `${item.quantity}x ${item.name}`).join(', ');
+    const valorPago = Number(order.valorPago || 0);
+    const falta = Math.max(Number(order.total || 0) - valorPago, 0);
+    return `
+      <tr>
+        <td>${escapeHtmlGlobal(order.customerName || 'Cliente sem nome')}</td>
+        <td>${escapeHtmlGlobal(formatPhone(order.customerJid))}</td>
+        <td>${escapeHtmlGlobal(STATUS_LABELS[order.status] || order.status)}</td>
+        <td>${escapeHtmlGlobal(items)}</td>
+        <td>${formatCurrency(order.total)}</td>
+        <td>${formatCurrency(valorPago)}</td>
+        <td>${formatCurrency(falta)}</td>
+        <td>${escapeHtmlGlobal(new Date(order.createdAt).toLocaleString('pt-BR'))}</td>
+      </tr>
+    `;
+  }).join('');
+
+  const totalGeral = orders.reduce((sum, o) => sum + Number(o.total || 0), 0);
+
+  const printWindow = window.open('', '_blank');
+  printWindow.document.write(`
+    <html>
+      <head>
+        <meta charset="UTF-8" />
+        <title>Pedidos - Padaria</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 24px; color: #3e2723; }
+          h1 { font-size: 18px; margin-bottom: 4px; }
+          p.muted { color: #8a7a6a; margin-top: 0; }
+          table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+          th, td { border: 1px solid #ccc; padding: 6px 8px; font-size: 12px; text-align: left; }
+          th { background: #faf3e3; }
+          tfoot td { font-weight: bold; }
+        </style>
+      </head>
+      <body>
+        <h1>🥖 Pedidos — Padaria</h1>
+        <p class="muted">Gerado em ${new Date().toLocaleString('pt-BR')} · ${orders.length} pedido(s)</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Cliente</th><th>Telefone</th><th>Status</th><th>Itens</th>
+              <th>Total</th><th>Pago</th><th>Falta</th><th>Data</th>
+            </tr>
+          </thead>
+          <tbody>${rowsHtml}</tbody>
+          <tfoot>
+            <tr><td colspan="4">Total geral</td><td>${formatCurrency(totalGeral)}</td><td colspan="3"></td></tr>
+          </tfoot>
+        </table>
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+  printWindow.focus();
+  printWindow.print();
 }
 
 async function addMenuItem(name, price) {
@@ -435,11 +627,130 @@ function closeHistoryModal() {
   document.getElementById('historyModal').classList.add('hidden');
 }
 
+function getOrderItemsFromEditor(orderIdx) {
+  const rows = Array.from(document.querySelectorAll(`.order-edit-item-row[data-idx="${orderIdx}"]`));
+  return rows.map((row) => ({
+    productId: row.dataset.productId ? Number(row.dataset.productId) : undefined,
+    name: row.dataset.name || '',
+    price: Number(row.dataset.price || 0),
+    quantity: Number(row.querySelector('.order-edit-item-qty').value || 1),
+  }));
+}
+
+function updateOrderEditSummary(orderIdx) {
+  const container = document.querySelector(`.order-edit-items[data-idx="${orderIdx}"]`);
+  if (!container) return;
+
+  const rows = Array.from(container.querySelectorAll('.order-edit-item-row'));
+  let total = 0;
+
+  rows.forEach((row) => {
+    const quantity = Number(row.querySelector('.order-edit-item-qty').value || 1);
+    const price = Number(row.dataset.price || 0);
+    const itemTotal = quantity * price;
+    total += itemTotal;
+    const priceEl = row.querySelector('.order-edit-item-price');
+    if (priceEl) priceEl.textContent = formatCurrency(itemTotal);
+  });
+
+  const totalEl = container.querySelector('.order-edit-total-value');
+  if (totalEl) totalEl.textContent = formatCurrency(total);
+}
+
+function buildOrderEditItemsMarkup(order, orderIdx) {
+  const menuOptions = (currentMenu || [])
+    .filter((item) => item.active)
+    .map((item) => `
+      <option value="${item.id}" data-name="${escapeHtmlGlobal(item.name)}" data-price="${Number(item.price || 0)}">
+        ${escapeHtmlGlobal(item.name)} — ${formatCurrency(item.price)}
+      </option>
+    `)
+    .join('');
+
+  const itemsMarkup = (order.items || []).map((item, itemIdx) => `
+    <div class="order-edit-item-row" data-idx="${orderIdx}" data-product-id="${item.productId || ''}" data-name="${escapeHtmlGlobal(item.name)}" data-price="${Number(item.price || 0)}">
+      <div class="order-edit-item-main">
+        <span class="order-edit-item-name">${escapeHtmlGlobal(item.name)}</span>
+        <div class="order-edit-item-controls">
+          <input type="number" min="1" class="order-edit-item-qty" data-idx="${orderIdx}" value="${Number(item.quantity || 1)}" />
+          <span class="order-edit-item-price">${formatCurrency(Number(item.price || 0) * Number(item.quantity || 1))}</span>
+          <button type="button" class="remove-order-item-button" data-idx="${orderIdx}">Remover</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+
+  const total = (order.items || []).reduce((sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 1), 0);
+
+  return `
+    <div class="order-edit-items" data-idx="${orderIdx}">
+      <div class="order-edit-items-list">
+        ${itemsMarkup || '<div class="muted">Nenhum item neste pedido.</div>'}
+      </div>
+      <div class="order-edit-item-adder">
+        <select class="order-edit-item-select" data-idx="${orderIdx}">
+          ${menuOptions || '<option value="">Nenhum item ativo</option>'}
+        </select>
+        <input type="number" min="1" class="order-edit-item-add-qty" data-idx="${orderIdx}" value="1" />
+        <button type="button" class="add-order-item-button" data-idx="${orderIdx}">Adicionar</button>
+      </div>
+      <div class="order-edit-total">
+        <span>Total estimado</span>
+        <strong class="order-edit-total-value">${formatCurrency(total)}</strong>
+      </div>
+    </div>
+  `;
+}
+
 function renderOrders(orders) {
   currentOrders = orders;
   orders.forEach((o) => knownOrderIds.add(String(o._id)));
   renderFilteredOrders();
   renderSalesSummary(orders);
+  renderItemsChart(orders);
+}
+
+const DIAS_ALERTA_DEVENDO = 3;
+function diasEmAberto(createdAt) {
+  const diffMs = Date.now() - new Date(createdAt).getTime();
+  return Math.floor(diffMs / (1000 * 60 * 60 * 24));
+}
+
+function renderItemsChart(orders) {
+  const panel = document.getElementById('itemsChartPanel');
+  if (!panel) return;
+
+  const totals = {};
+  orders.forEach((order) => {
+    if (order.status === 'cancelado') return;
+    (order.items || []).forEach((item) => {
+      totals[item.name] = (totals[item.name] || 0) + Number(item.quantity || 0);
+    });
+  });
+
+  const entries = Object.entries(totals).sort((a, b) => b[1] - a[1]).slice(0, 8);
+
+  if (!entries.length) {
+    panel.innerHTML = '';
+    return;
+  }
+
+  const max = entries[0][1];
+
+  panel.innerHTML = `
+    <h3 class="chart-title">🥖 Itens mais vendidos</h3>
+    <div class="chart-bars">
+      ${entries.map(([name, qty]) => `
+        <div class="chart-bar-row">
+          <span class="chart-bar-label">${escapeHtmlGlobal(name)}</span>
+          <div class="chart-bar-track">
+            <div class="chart-bar-fill" style="width: ${Math.max((qty / max) * 100, 4)}%"></div>
+          </div>
+          <span class="chart-bar-value">${qty}</span>
+        </div>
+      `).join('')}
+    </div>
+  `;
 }
 
 function renderSalesSummary(orders) {
@@ -507,8 +818,16 @@ function renderFilteredOrders() {
             <span class="value">${formatCurrency(valorPago)} / ${formatCurrency(falta)}</span>
           </div>` : '';
 
+    const dias = diasEmAberto(order.createdAt);
+    const isOverdueDebt = order.status === 'devendo' && dias >= DIAS_ALERTA_DEVENDO;
+    const overdueClass = isOverdueDebt ? 'overdue-debt' : '';
+    const overdueBadgeHtml = isOverdueDebt
+      ? `<div class="overdue-badge">⚠️ Devendo há ${dias} dia${dias === 1 ? '' : 's'}</div>`
+      : '';
+
     return `
-      <article class="order-card status-${escapeHtml(order.status)}">
+      <article class="order-card status-${escapeHtml(order.status)} ${overdueClass}">
+        ${overdueBadgeHtml}
         <div class="order-top">
           <div class="avatar">${escapeHtml(initials(order.customerName || 'Cliente sem nome'))}</div>
           <div class="order-who customer-link" data-jid="${escapeHtml(order.customerJid || '')}" data-name="${escapeHtml(order.customerName || '')}" title="Ver histórico deste cliente">
@@ -559,8 +878,8 @@ function renderFilteredOrders() {
               </select>
             </div>
             <div class="edit-field">
-              <label for="total-${idx}">Total</label>
-              <input id="total-${idx}" type="number" step="0.01" value="${Number(order.total || 0).toFixed(2)}" />
+              <label>Itens do pedido</label>
+              ${buildOrderEditItemsMarkup(order, idx)}
             </div>
             <div class="edit-field">
               <label for="valorPago-${idx}">Valor pago</label>
@@ -618,6 +937,20 @@ document.addEventListener('DOMContentLoaded', () => {
     exportOrdersToCsv();
   });
 
+  document.getElementById('exportPdf').addEventListener('click', () => {
+    exportOrdersToPdf();
+  });
+
+  document.getElementById('openNewOrder').addEventListener('click', () => {
+    openNewOrderModal();
+  });
+
+  document.getElementById('addNewOrderItem').addEventListener('click', () => {
+    addItemToNewOrder();
+  });
+
+  document.getElementById('newOrderForm').addEventListener('submit', submitNewOrder);
+
   loadPage();
 });
 
@@ -635,6 +968,17 @@ document.addEventListener('click', async (event) => {
 
   if (event.target.id === 'closeHistoryModal' || event.target.id === 'historyModal') {
     closeHistoryModal();
+    return;
+  }
+
+  if (event.target.id === 'closeNewOrderModal' || event.target.id === 'newOrderModal') {
+    closeNewOrderModal();
+    return;
+  }
+
+  if (event.target.classList.contains('remove-new-order-item')) {
+    const idx = Number(event.target.dataset.removeIdx);
+    removeItemFromNewOrder(idx);
     return;
   }
 
@@ -707,6 +1051,55 @@ document.addEventListener('click', async (event) => {
     return;
   }
 
+  if (event.target.classList.contains('add-order-item-button')) {
+    const idx = event.target.dataset.idx;
+    const select = document.querySelector(`.order-edit-item-select[data-idx="${idx}"]`);
+    const qtyInput = document.querySelector(`.order-edit-item-add-qty[data-idx="${idx}"]`);
+    const container = document.querySelector(`.order-edit-items[data-idx="${idx}"]`);
+
+    if (!select || !container) return;
+
+    const selectedOption = select.selectedOptions[0];
+    if (!selectedOption || !selectedOption.value) {
+      alert('Selecione um item do cardápio antes de adicionar.');
+      return;
+    }
+
+    const name = selectedOption.dataset.name || selectedOption.textContent;
+    const price = Number(selectedOption.dataset.price || 0);
+    const quantity = Number(qtyInput.value || 1);
+    const list = container.querySelector('.order-edit-items-list');
+
+    const row = document.createElement('div');
+    row.className = 'order-edit-item-row';
+    row.dataset.idx = idx;
+    row.dataset.productId = selectedOption.value;
+    row.dataset.name = name;
+    row.dataset.price = price;
+    row.innerHTML = `
+      <div class="order-edit-item-main">
+        <span class="order-edit-item-name">${escapeHtmlGlobal(name)}</span>
+        <div class="order-edit-item-controls">
+          <input type="number" min="1" class="order-edit-item-qty" data-idx="${idx}" value="${quantity}" />
+          <span class="order-edit-item-price">${formatCurrency(price * quantity)}</span>
+          <button type="button" class="remove-order-item-button" data-idx="${idx}">Remover</button>
+        </div>
+      </div>
+    `;
+
+    list.appendChild(row);
+    updateOrderEditSummary(idx);
+    return;
+  }
+
+  if (event.target.classList.contains('remove-order-item-button')) {
+    const idx = event.target.dataset.idx;
+    const row = event.target.closest('.order-edit-item-row');
+    if (row) row.remove();
+    updateOrderEditSummary(idx);
+    return;
+  }
+
   if (event.target.classList.contains('status-button')) {
     const orderId = event.target.dataset.id;
     const idx = event.target.dataset.idx;
@@ -731,11 +1124,19 @@ document.addEventListener('click', async (event) => {
     const messageEl = document.querySelector(`.order-action-message[data-idx="${idx}"]`);
     messageEl.textContent = 'Salvando...';
 
+    const items = getOrderItemsFromEditor(idx);
+    if (!items.length) {
+      messageEl.textContent = 'Adicione pelo menos um item ao pedido.';
+      return;
+    }
+
+    const total = items.reduce((sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 1), 0);
     const updates = {
       customerName: document.getElementById(`name-${idx}`).value.trim(),
       customerJid: document.getElementById(`phone-${idx}`).value.trim(),
       status: document.getElementById(`status-${idx}`).value,
-      total: Number(document.getElementById(`total-${idx}`).value || 0),
+      items,
+      total,
       valorPago: Number(document.getElementById(`valorPago-${idx}`).value || 0),
     };
 
@@ -778,6 +1179,10 @@ document.addEventListener('change', (event) => {
 document.addEventListener('input', (event) => {
   if (event.target.id === 'search') {
     renderFilteredOrders();
+  }
+
+  if (event.target.classList.contains('order-edit-item-qty')) {
+    updateOrderEditSummary(event.target.dataset.idx);
   }
 });
 

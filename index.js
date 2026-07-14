@@ -47,7 +47,7 @@ const ALLOWED_ORIGIN = process.env.SITE_ORIGIN || 'https://padariabot433-cmyk.gi
 
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', ALLOWED_ORIGIN);
-  res.header('Access-Control-Allow-Methods', 'GET, PATCH, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') {
     return res.sendStatus(204);
@@ -151,6 +151,45 @@ app.get('/api/orders', adminAuth, async (req, res) => {
   }
 });
 
+// Cria um pedido manualmente pelo painel (ex: pedido feito por telefone ou
+// pessoalmente no balcão), sem precisar passar pelo fluxo do WhatsApp.
+app.post('/api/orders', adminAuth, async (req, res) => {
+  try {
+    const { customerName, customerJid, items, status, valorPago } = req.body;
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'Inclua ao menos um item no pedido.' });
+    }
+
+    const validStatus = ['pendente', 'devendo', 'ok', 'confirmado', 'entregue', 'cancelado'];
+    const finalStatus = validStatus.includes(status) ? status : 'pendente';
+
+    const total = items.reduce((sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0), 0);
+
+    const order = await Order.create({
+      customerName: customerName || '',
+      customerJid: customerJid || '',
+      items,
+      total,
+      valorPago: Number(valorPago) || 0,
+      status: finalStatus,
+    });
+
+    if (customerJid) {
+      await Customer.findOneAndUpdate(
+        { jid: customerJid },
+        { jid: customerJid, name: customerName || undefined, updatedAt: new Date() },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      );
+    }
+
+    res.status(201).json(order);
+  } catch (error) {
+    console.error('Erro ao criar pedido manual:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.patch('/api/orders/:id', adminAuth, async (req, res) => {
   try {
     const { id } = req.params;
@@ -167,12 +206,14 @@ app.patch('/api/orders/:id', adminAuth, async (req, res) => {
       return res.status(400).json({ error: 'Status inválido.' });
     }
 
-    if (updates.items && !Array.isArray(updates.items)) {
-      return res.status(400).json({ error: 'Itens devem ser um array.' });
-    }
-
-    if (updates.items && !updates.total) {
-      updates.total = updates.items.reduce((sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0), 0);
+    if (updates.items) {
+      if (!Array.isArray(updates.items)) {
+        return res.status(400).json({ error: 'Itens devem ser um array.' });
+      }
+      if (updates.items.length === 0) {
+        return res.status(400).json({ error: 'Adicione ao menos um item ao pedido.' });
+      }
+      updates.total = updates.items.reduce((sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 1), 0);
     }
 
     if (updates.valorPago !== undefined) {

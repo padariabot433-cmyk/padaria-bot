@@ -120,6 +120,67 @@ button:hover { opacity: 0.92; }
   color: var(--muted);
   font-size: 0.8rem;
 }
+
+.items-chart-panel {
+  background: var(--card);
+  padding: 1.1rem 1.3rem;
+  border-radius: 14px;
+  box-shadow: 0 4px 16px rgba(62,39,35,0.08);
+  margin-bottom: 1rem;
+}
+.chart-title {
+  margin: 0 0 0.9rem;
+  font-family: 'Fraunces', serif;
+  font-size: 1.1rem;
+}
+.chart-bars {
+  display: grid;
+  gap: 0.55rem;
+}
+.chart-bar-row {
+  display: grid;
+  grid-template-columns: 140px 1fr 40px;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.85rem;
+}
+.chart-bar-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text);
+}
+.chart-bar-track {
+  background: #f4ece0;
+  border-radius: 999px;
+  height: 10px;
+  overflow: hidden;
+}
+.chart-bar-fill {
+  background: var(--wheat);
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+.chart-bar-value {
+  text-align: right;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.overdue-badge {
+  background: #fdecea;
+  color: #b43728;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.45rem 1.1rem;
+  text-align: center;
+}
+.order-card.overdue-debt {
+  border-left-color: #b43728;
+  box-shadow: 0 4px 16px rgba(180, 55, 40, 0.18);
+}
+
 .orders {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
@@ -257,6 +318,79 @@ button:hover { opacity: 0.92; }
   gap: 0.35rem;
 }
 .order-details.hidden { display: none; }
+
+.order-edit-items {
+  display: grid;
+  gap: 0.6rem;
+}
+.order-edit-items-list {
+  display: grid;
+  gap: 0.45rem;
+}
+.order-edit-item-row {
+  background: #fffaf2;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.6rem 0.7rem;
+}
+.order-edit-item-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.order-edit-item-name {
+  font-weight: 600;
+  color: var(--text);
+}
+.order-edit-item-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+.order-edit-item-controls input {
+  min-width: 70px;
+  flex: none;
+}
+.order-edit-item-price {
+  color: var(--muted);
+  font-size: 0.85rem;
+  min-width: 72px;
+  text-align: right;
+}
+.order-edit-item-controls button,
+.order-edit-item-adder button {
+  background: var(--accent);
+  color: white;
+  padding: 0.4rem 0.6rem;
+  border-radius: 7px;
+  font-size: 0.8rem;
+}
+.order-edit-item-adder {
+  display: flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+.order-edit-item-adder select,
+.order-edit-item-adder input {
+  min-width: 0;
+  flex: 1;
+}
+.order-edit-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 0.3rem;
+  border-top: 1px dashed var(--border);
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.order-edit-total strong {
+  color: var(--accent);
+  font-size: 1rem;
+}
 .order-details b { color: var(--text); }
 
 .card-actions {
@@ -612,4 +746,26 @@ button:hover { opacity: 0.92; }
   color: var(--wheat);
   font-weight: 600;
   margin-top: 0.3rem;
+}
+
+.new-order-form {
+  display: grid;
+  gap: 0.8rem;
+}
+.new-order-item-picker {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.new-order-item-picker select { flex: 2; min-width: 160px; }
+.new-order-item-picker input { flex: 0 0 80px; }
+.new-order-item-picker button { flex: 0 0 auto; }
+.remove-new-order-item {
+  background: none;
+  border: none;
+  color: #b43728;
+  cursor: pointer;
+  font-weight: 700;
+  padding: 0 0.2rem;
+  margin-left: 0.4rem;
 }
