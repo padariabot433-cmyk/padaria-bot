@@ -142,6 +142,21 @@ function renderTopItems(topItems) {
   `;
 }
 
+// Atualiza a pílula/badge do floating dot. Disponível em escopo global
+function updateFloatingBadge() {
+  const badge = document.getElementById('floatingBadge');
+  if (!badge) return;
+  // Se houver contador de pendentes na página (como em pedidos), use-o.
+  const pendentesEl = document.getElementById('pendentes');
+  const count = pendentesEl ? Number(pendentesEl.textContent) || 0 : ((lastSelected && Array.isArray(lastSelected.topItems)) ? lastSelected.topItems.length : 0);
+  if (count > 0) {
+    badge.textContent = String(count);
+    badge.classList.remove('hidden');
+  } else {
+    badge.classList.add('hidden');
+  }
+}
+
 async function loadDashboard(isLoginAttempt = false) {
   const errorEl = document.getElementById('loginError');
   if (isLoginAttempt) errorEl.textContent = 'Verificando...';
@@ -176,7 +191,7 @@ async function loadDashboard(isLoginAttempt = false) {
   lastSelected = data.selected || { dailyRevenue: [], topItems: [] };
   renderRevenueChart(lastSelected.dailyRevenue);
   renderTopItems(lastSelected.topItems);
-  updateFloatingBadge();
+  if (typeof window.updateFloatingBadge === 'function') window.updateFloatingBadge();
 }
 
 function tryLogin(password) {
@@ -244,9 +259,6 @@ document.addEventListener('DOMContentLoaded', () => {
   } else {
     showLogin();
   }
-
-  // update badge initially (in case data is already loaded)
-  updateFloatingBadge();
 
   // Quick actions: move controls into floating menu when toggled
   const quickBtn = document.getElementById('quickActionsBtn');
@@ -335,17 +347,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (floatingDot) floatingDot.classList.remove('hidden');
   }
 
-  function updateFloatingBadge() {
-    const badge = document.getElementById('floatingBadge');
-    if (!badge) return;
-    const count = (lastSelected && Array.isArray(lastSelected.topItems)) ? lastSelected.topItems.length : 0;
-    if (count > 0) {
-      badge.textContent = String(count);
-      badge.classList.remove('hidden');
-    } else {
-      badge.classList.add('hidden');
-    }
-  }
+  // window.updateFloatingBadge está definido em escopo global (fora do DOMContentLoaded)
 
   // Close button minimizes to dot
   if (floatingBarClose) floatingBarClose.addEventListener('click', minimizeFloatingBar);
@@ -354,4 +356,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Start with bar visible if controls exist
   if (controlsEl && floatingBar) showFloatingBar();
+  window.updateFloatingBadge();
+
+  // Barra de navegação rápida (pílula): Pedidos + Cardápio, minimizável em bolinha
+  const quickNavBar = document.getElementById('quickNavBar');
+  const quickNavClose = document.getElementById('quickNavClose');
+  const quickNavDot = document.getElementById('quickNavDot');
+
+  function hideQuickNav() {
+    if (!quickNavBar || !quickNavDot) return;
+    if (quickNavBar.contains(document.activeElement) && document.activeElement.blur) {
+      document.activeElement.blur();
+    }
+    quickNavBar.classList.add('hidden');
+    quickNavBar.setAttribute('aria-hidden', 'true');
+    quickNavDot.classList.remove('hidden');
+  }
+
+  function showQuickNav() {
+    if (!quickNavBar || !quickNavDot) return;
+    quickNavBar.classList.remove('hidden');
+    quickNavBar.setAttribute('aria-hidden', 'false');
+    quickNavDot.classList.add('hidden');
+  }
+
+  if (quickNavClose) quickNavClose.addEventListener('click', hideQuickNav);
+  if (quickNavDot) quickNavDot.addEventListener('click', (e) => { e.stopPropagation(); showQuickNav(); });
 });
