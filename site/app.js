@@ -1103,6 +1103,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (controlsEl && floatingBar) showFloatingBar();
   window.updateFloatingBadge();
+
+  // Barra de navegação rápida (pílula): Dashboard + Cardápio, minimizável em bolinha
+  const quickNavBar = document.getElementById('quickNavBar');
+  const quickNavClose = document.getElementById('quickNavClose');
+  const quickNavDot = document.getElementById('quickNavDot');
+  const quickNavMenuBtn = document.getElementById('quickNavMenuBtn');
+
+  function hideQuickNav() {
+    if (!quickNavBar || !quickNavDot) return;
+    quickNavBar.classList.add('hidden');
+    quickNavBar.setAttribute('aria-hidden', 'true');
+    quickNavDot.classList.remove('hidden');
+  }
+
+  function showQuickNav() {
+    if (!quickNavBar || !quickNavDot) return;
+    quickNavBar.classList.remove('hidden');
+    quickNavBar.setAttribute('aria-hidden', 'false');
+    quickNavDot.classList.add('hidden');
+  }
+
+  if (quickNavClose) quickNavClose.addEventListener('click', hideQuickNav);
+  if (quickNavDot) quickNavDot.addEventListener('click', (e) => { e.stopPropagation(); showQuickNav(); });
+  if (quickNavMenuBtn) {
+    quickNavMenuBtn.addEventListener('click', async () => {
+      const section = document.getElementById('menuSection');
+      if (!section) return;
+      const isHidden = section.classList.contains('hidden');
+      section.classList.toggle('hidden');
+      if (isHidden) await loadMenu();
+    });
+  }
 });
 
 document.addEventListener('click', async (event) => {

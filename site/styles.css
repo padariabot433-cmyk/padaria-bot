@@ -1043,3 +1043,82 @@ button:hover { opacity: 0.92; }
   .floating-bar { border-radius: 12px; }
   .floating-bar-content { padding-top: 1rem; }
 }
+
+/* Barra de navegação rápida em formato de pílula (Dashboard / Cardápio) */
+.nav-pill-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--accent);
+  color: white;
+  padding: 0.6rem 0.9rem 0.6rem 1.2rem;
+  border-radius: 999px;
+  box-shadow: 0 10px 32px rgba(0,0,0,0.28);
+  z-index: 160;
+  transition: transform 260ms cubic-bezier(.2,.9,.2,1), opacity 200ms ease;
+}
+.nav-pill-bar.hidden {
+  transform: translateX(-50%) translateY(140%);
+  opacity: 0;
+  pointer-events: none;
+}
+.nav-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: rgba(255,255,255,0.16);
+  color: white;
+  border: none;
+  padding: 0.55rem 1.05rem;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.92rem;
+  font-family: 'Work Sans', sans-serif;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 150ms ease;
+  white-space: nowrap;
+}
+.nav-pill-btn:hover { background: rgba(255,255,255,0.3); }
+.nav-pill-close {
+  background: transparent;
+  border: none;
+  color: rgba(255,255,255,0.85);
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 0.4rem 0.5rem;
+  line-height: 1;
+}
+.nav-pill-close:hover { color: white; }
+
+/* Bolinha minimizada da barra de navegação — empilhada acima da bolinha de ações,
+   pra não sobrepor caso as duas estejam minimizadas ao mesmo tempo. */
+.nav-pill-dot {
+  position: fixed;
+  right: 18px;
+  bottom: 76px;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: white;
+  display: grid;
+  place-items: center;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 8px 22px rgba(0,0,0,0.28);
+  z-index: 160;
+  transition: transform 180ms ease;
+  font-size: 1.05rem;
+}
+.nav-pill-dot.hidden { display: none; }
+.nav-pill-dot:active { transform: scale(0.95); }
+
+@media (max-width: 720px) {
+  .nav-pill-bar { padding: 0.55rem 0.7rem 0.55rem 1rem; gap: 0.35rem; }
+  .nav-pill-btn { padding: 0.5rem 0.8rem; font-size: 0.85rem; }
+}
