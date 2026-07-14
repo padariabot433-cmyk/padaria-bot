@@ -428,12 +428,21 @@ async function loadPage() {
 }
 
 async function loadOrders(isLoginAttempt = false) {
-  const fromDay = document.getElementById('fromDay').value;
-  const toDay = document.getElementById('toDay').value;
+  const fromDayEl = document.getElementById('fromDay');
+  const toDayEl = document.getElementById('toDay');
+  const dayEl = document.getElementById('day');
+  const fromDay = fromDayEl ? fromDayEl.value : '';
+  const toDay = toDayEl ? toDayEl.value : '';
+  const day = dayEl ? dayEl.value : '';
   const status = document.getElementById('status').value;
   const url = new URL(API_URL, window.location.origin);
-  if (fromDay) url.searchParams.set('fromDay', fromDay);
-  if (toDay) url.searchParams.set('toDay', toDay);
+  // Prefer single-day view when `day` is set; otherwise use the range
+  if (day) {
+    url.searchParams.set('day', day);
+  } else {
+    if (fromDay) url.searchParams.set('fromDay', fromDay);
+    if (toDay) url.searchParams.set('toDay', toDay);
+  }
   if (status) url.searchParams.set('status', status);
 
   const errorEl = document.getElementById('loginError');
@@ -959,6 +968,37 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   document.getElementById('newOrderForm').addEventListener('submit', submitNewOrder);
+
+  // Day navigator setup: prev/next buttons and day label
+  const prevBtn = document.getElementById('prevDay');
+  const nextBtn = document.getElementById('nextDay');
+  const dayInput = document.getElementById('day');
+  function updateSelectedDayLabel() {
+    const label = document.getElementById('selectedDayLabel');
+    if (!label || !dayInput) return;
+    if (!dayInput.value) { label.textContent = ''; return; }
+    const d = new Date(dayInput.value);
+    label.textContent = `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
+  }
+  function changeDay(delta) {
+    if (!dayInput) return;
+    const cur = dayInput.value ? new Date(dayInput.value) : new Date();
+    cur.setDate(cur.getDate() + delta);
+    dayInput.value = cur.toISOString().slice(0, 10);
+    const fd = document.getElementById('fromDay');
+    const td = document.getElementById('toDay');
+    if (fd) fd.value = '';
+    if (td) td.value = '';
+    updateSelectedDayLabel();
+    loadOrders();
+  }
+  if (prevBtn) prevBtn.addEventListener('click', () => changeDay(-1));
+  if (nextBtn) nextBtn.addEventListener('click', () => changeDay(1));
+  if (dayInput) {
+    dayInput.addEventListener('change', () => { updateSelectedDayLabel(); loadOrders(); });
+    if (!dayInput.value) dayInput.value = new Date().toISOString().slice(0, 10);
+    updateSelectedDayLabel();
+  }
 
   loadPage();
 });
