@@ -34,7 +34,12 @@ function showApp() {
 
 function buildDashboardUrl() {
   const period = document.getElementById('periodSelect').value;
-  const url = new URL(API_DASHBOARD_URL);
+  let url;
+  try {
+    url = new URL(API_DASHBOARD_URL);
+  } catch (e) {
+    url = new URL(API_DASHBOARD_URL, location.origin);
+  }
   url.searchParams.set('period', period);
   if (period === 'custom') {
     const start = document.getElementById('startDate').value;
@@ -117,19 +122,22 @@ function renderTopItems(topItems) {
     return;
   }
 
-  const max = topItems[0].qty;
+  const max = Number(topItems[0].qty) || 1;
   panel.innerHTML = `
     <h3 class="chart-title">🥖 Itens mais vendidos</h3>
     <div class="chart-bars">
-      ${topItems.map((item) => `
+      ${topItems.map((item) => {
+        const qty = Number(item.qty) || 0;
+        const width = Math.max((qty / max) * 100, 4);
+        return `
         <div class="chart-bar-row">
           <span class="chart-bar-label">${escapeHtml(item.name)}</span>
           <div class="chart-bar-track">
-            <div class="chart-bar-fill" style="width: ${Math.max((item.qty / max) * 100, 4)}%"></div>
+            <div class="chart-bar-fill" style="width: ${width}%"></div>
           </div>
-          <span class="chart-bar-value">${item.qty}</span>
+          <span class="chart-bar-value">${qty}</span>
         </div>
-      `).join('')}
+      `}).join('')}
     </div>
   `;
 }
