@@ -304,6 +304,49 @@
         grid-column: 1 / -1;
       }
 
+      .status-actions {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        padding: 0.75rem 1.1rem 0.75rem;
+      }
+      .status-button {
+        flex: 1 1 0;
+        text-align: center;
+        font-weight: 600;
+        transition: transform 0.15s ease, background 0.15s ease;
+      }
+      .status-button[data-status="pendente"] {
+        background: #f4e1d8;
+        color: var(--accent);
+        border: 1px solid rgba(168,68,46,0.3);
+      }
+      .status-button[data-status="devendo"] {
+        background: #f7e6c4;
+        color: #8a5a12;
+        border: 1px solid rgba(198,138,46,0.35);
+      }
+      .status-button[data-status="ok"] {
+        background: #e4eadd;
+        color: var(--accent-2);
+        border: 1px solid rgba(95,122,82,0.3);
+      }
+      .status-button.active[data-status="pendente"] {
+        background: var(--accent);
+        color: white;
+        border-color: var(--accent);
+      }
+      .status-button.active[data-status="devendo"] {
+        background: var(--wheat);
+        color: white;
+        border-color: var(--wheat);
+      }
+      .status-button.active[data-status="ok"] {
+        background: var(--accent-2);
+        color: white;
+        border-color: var(--accent-2);
+      }
+
       .menu-section {
         background: var(--card);
         border-radius: 14px;
@@ -877,9 +920,9 @@
                 </div>
               </div>
               <div class="status-actions">
-                <button class="status-button" type="button" data-id="${escapeHtml(order._id)}" data-idx="${idx}" data-status="pendente">Pendente</button>
-                <button class="status-button" type="button" data-id="${escapeHtml(order._id)}" data-idx="${idx}" data-status="devendo">Devendo</button>
-                <button class="status-button" type="button" data-id="${escapeHtml(order._id)}" data-idx="${idx}" data-status="ok">Ok</button>
+                <button class="status-button ${order.status === 'pendente' ? 'active' : ''}" type="button" data-id="${escapeHtml(order._id)}" data-idx="${idx}" data-status="pendente">Pendente</button>
+                <button class="status-button ${order.status === 'devendo' ? 'active' : ''}" type="button" data-id="${escapeHtml(order._id)}" data-idx="${idx}" data-status="devendo">Devendo</button>
+                <button class="status-button ${order.status === 'ok' ? 'active' : ''}" type="button" data-id="${escapeHtml(order._id)}" data-idx="${idx}" data-status="ok">Ok</button>
               </div>
               <div class="card-actions">
                 <button class="edit-order-button" data-id="${escapeHtml(order._id)}" data-idx="${idx}">Editar</button>
