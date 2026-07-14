@@ -1,1 +1,0 @@
-export { menuRouter } from './menu/menuRoutes.js';
