@@ -428,6 +428,9 @@ async function loadPage() {
 }
 
 async function loadOrders(isLoginAttempt = false) {
+  if (!currentMenu.length) {
+    await loadMenu();
+  }
   const fromDayEl = document.getElementById('fromDay');
   const toDayEl = document.getElementById('toDay');
   const dayEl = document.getElementById('day');

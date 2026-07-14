@@ -32,6 +32,12 @@
       <main>
         <div class="controls">
           <input id="search" type="text" placeholder="Buscar por nome ou telefone..." />
+          <div class="day-nav">
+            <button id="prevDay" type="button">‹</button>
+            <input id="day" type="date" aria-label="Dia" />
+            <button id="nextDay" type="button">›</button>
+            <span id="selectedDayLabel" class="muted"></span>
+          </div>
           <input id="fromDay" type="date" aria-label="Data início" />
           <input id="toDay" type="date" aria-label="Data fim" />
           <select id="status">
