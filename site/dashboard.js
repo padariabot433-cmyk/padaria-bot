@@ -21,8 +21,6 @@
   const $refresh = qs('#refresh');
   const $exportCsv = qs('#exportCsv');
   const $darkToggle = qs('#darkToggle');
-
-  const $topItems = qs('#topItems');
   const revenueCtx = document.getElementById('revenueChart').getContext('2d');
   let revenueChart = null;
 
@@ -170,23 +168,47 @@
     });
   }
 
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  // Render the same structure used by the main pedidos view (app.js)
   function renderTopItems(orders){
-    const map = new Map();
-    orders.forEach(o=>{
-      o.items.forEach(it=>{
-        const prev = map.get(it.name) || 0;
-        map.set(it.name, prev + (it.qty||1));
+    const panel = document.getElementById('itemsChartPanel');
+    if(!panel) return;
+
+    const totals = {};
+    (orders || []).forEach((order) => {
+      if (order.status === 'cancelado') return;
+      (order.items || []).forEach((item) => {
+        const qty = Number(item.quantity || item.qty || 0) || 0;
+        totals[item.name] = (totals[item.name] || 0) + qty;
       });
     });
-    const arr = Array.from(map.entries()).sort((a,b)=>b[1]-a[1]).slice(0,8);
-    const max = arr[0] ? arr[0][1] : 1;
-    $topItems.innerHTML = '';
-    arr.forEach(([name,qty]) => {
-      const row = document.createElement('div'); row.className = 'chart-bar-row';
-      row.innerHTML = `<div class="chart-bar-label">${name}</div><div class="chart-bar-track"><div class="chart-bar-fill" style="width:${Math.round(qty/max*100)}%"></div></div><div class="chart-bar-value">${qty}</div>`;
-      $topItems.appendChild(row);
-    });
-    if(arr.length===0){ $topItems.innerHTML = '<div class="empty">Nenhum item encontrado no período.</div>'; }
+
+    const entries = Object.entries(totals).sort((a,b)=>b[1]-a[1]).slice(0,8);
+    if(!entries.length){ panel.innerHTML = ''; return; }
+    const max = entries[0][1];
+
+    panel.innerHTML = `
+      <h3 class="chart-title">🥖 Itens mais vendidos</h3>
+      <div class="chart-bars">
+        ${entries.map(([name, qty]) => `
+          <div class="chart-bar-row">
+            <span class="chart-bar-label">${escapeHtml(name)}</span>
+            <div class="chart-bar-track">
+              <div class="chart-bar-fill" style="width: ${Math.max((qty / max) * 100, 4)}%"></div>
+            </div>
+            <span class="chart-bar-value">${qty}</span>
+          </div>
+        `).join('')}
+      </div>
+    `;
   }
 
   function exportCSV(orders){

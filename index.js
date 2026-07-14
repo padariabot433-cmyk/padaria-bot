@@ -301,9 +301,33 @@ function startOfWeek(date) {
   return d;
 }
 
-// Resumo do dashboard: total de pedidos e faturamento por período
-// (últimas 24h, semana atual, mês atual, ano atual). Pedidos cancelados
-// não entram no total nem na contagem.
+// Resolve o intervalo de datas do período escolhido no seletor do dashboard
+// (usado pelo gráfico de receita e pelo ranking de itens mais vendidos).
+function resolveSelectedRange(period, startParam, endParam, now) {
+  if (period === 'custom') {
+    const start = startParam ? new Date(startParam) : new Date(0);
+    start.setHours(0, 0, 0, 0);
+    const end = endParam ? new Date(endParam) : new Date(now);
+    end.setHours(23, 59, 59, 999);
+    return { start, end };
+  }
+  if (period === '24h') {
+    return { start: new Date(now.getTime() - 24 * 60 * 60 * 1000), end: now };
+  }
+  if (period === 'week') {
+    return { start: startOfWeek(now), end: now };
+  }
+  if (period === 'year') {
+    return { start: new Date(now.getFullYear(), 0, 1), end: now };
+  }
+  // padrão: mês atual
+  return { start: new Date(now.getFullYear(), now.getMonth(), 1), end: now };
+}
+
+// Resumo do dashboard: os 4 cards fixos (últimas 24h, semana, mês, ano) mais
+// um bloco "selected" com receita por dia e itens mais vendidos do período
+// escolhido no seletor (usado pelo gráfico e pelo ranking). Pedidos
+// cancelados não entram em nenhum total.
 app.get('/api/dashboard', adminAuth, async (req, res) => {
   try {
     if (mongoose.connection.readyState !== 1) {
@@ -311,7 +335,7 @@ app.get('/api/dashboard', adminAuth, async (req, res) => {
     }
 
     const now = new Date();
-    const periods = {
+    const fixedPeriods = {
       last24h: new Date(now.getTime() - 24 * 60 * 60 * 1000),
       week: startOfWeek(now),
       month: new Date(now.getFullYear(), now.getMonth(), 1),
@@ -319,7 +343,7 @@ app.get('/api/dashboard', adminAuth, async (req, res) => {
     };
 
     const results = {};
-    for (const [key, since] of Object.entries(periods)) {
+    for (const [key, since] of Object.entries(fixedPeriods)) {
       const orders = await Order.find({
         createdAt: { $gte: since },
         status: { $ne: 'cancelado' },
@@ -329,6 +353,40 @@ app.get('/api/dashboard', adminAuth, async (req, res) => {
         total: orders.reduce((sum, o) => sum + Number(o.total || 0), 0),
       };
     }
+
+    const { period = 'month', start: startParam, end: endParam } = req.query;
+    const { start, end } = resolveSelectedRange(period, startParam, endParam, now);
+
+    const selectedOrders = await Order.find({
+      createdAt: { $gte: start, $lte: end },
+      status: { $ne: 'cancelado' },
+    });
+
+    const dailyMap = {};
+    const itemsMap = {};
+    selectedOrders.forEach((order) => {
+      const day = new Date(order.createdAt).toISOString().slice(0, 10);
+      dailyMap[day] = (dailyMap[day] || 0) + Number(order.total || 0);
+      (order.items || []).forEach((item) => {
+        itemsMap[item.name] = (itemsMap[item.name] || 0) + Number(item.quantity || 0);
+      });
+    });
+
+    const dailyRevenue = Object.entries(dailyMap)
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([date, total]) => ({ date, total }));
+
+    const topItems = Object.entries(itemsMap)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([name, qty]) => ({ name, qty }));
+
+    results.selected = {
+      count: selectedOrders.length,
+      total: selectedOrders.reduce((sum, o) => sum + Number(o.total || 0), 0),
+      dailyRevenue,
+      topItems,
+    };
 
     res.json({ ...results, generatedAt: now });
   } catch (error) {
