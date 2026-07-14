@@ -536,14 +536,19 @@ button:hover { opacity: 0.92; }
   }
 
   .controls > * {
-    width: 100%;
     flex-basis: 100%;
+  }
+
+  /* Keep the sound-toggle compact instead of forcing full-width */
+  .controls > .sound-toggle {
+    flex-basis: auto;
+    width: auto;
+    align-self: center;
   }
 
   .controls input,
   .controls select,
-  .controls button,
-  .controls .sound-toggle {
+  .controls button {
     width: 100%;
     min-width: 0;
   }
@@ -905,4 +910,12 @@ button:hover { opacity: 0.92; }
   font-weight: 700;
   padding: 0 0.2rem;
   margin-left: 0.4rem;
+}
+
+/* Improve checkbox sizing/alignment for the sound toggle */
+.sound-toggle input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin-right: 0.45rem;
+  transform: translateY(1px);
 }

@@ -1,5 +1,9 @@
-const API_URL = 'https://padaria-bot-cbf7.onrender.com/api/orders';
-const API_MENU_URL = 'https://padaria-bot-cbf7.onrender.com/api/menu';
+// API endpoints: allow override from the page (`window.PADARIA_API_URL`) or
+// fall back to the default host. When the panel is served from the same
+// backend (via `/site`), `API_URL` may be a relative URL and will work.
+const DEFAULT_API_HOST = 'https://padaria-bot-cbf7.onrender.com';
+const API_URL = window.PADARIA_API_URL || DEFAULT_API_HOST + '/api/orders';
+const API_MENU_URL = window.PADARIA_API_MENU_URL || DEFAULT_API_HOST + '/api/menu';
 let currentOrders = [];
 let currentMenu = [];
 let newOrderItems = [];
@@ -383,7 +387,12 @@ async function checkForNewOrders() {
 
 function startPolling() {
   if (pollInterval) clearInterval(pollInterval);
-  pollInterval = setInterval(checkForNewOrders, 20000);
+  // wrap the async call so promise rejections are logged (setInterval does
+  // not handle returned promises). This avoids uncaught rejections in the
+  // console when network errors happen.
+  pollInterval = setInterval(() => {
+    checkForNewOrders().catch((err) => console.error('Erro em checkForNewOrders (interval):', err));
+  }, 20000);
 }
 
 function stopPolling() {
@@ -422,7 +431,7 @@ async function loadOrders(isLoginAttempt = false) {
   const fromDay = document.getElementById('fromDay').value;
   const toDay = document.getElementById('toDay').value;
   const status = document.getElementById('status').value;
-  const url = new URL(API_URL);
+  const url = new URL(API_URL, window.location.origin);
   if (fromDay) url.searchParams.set('fromDay', fromDay);
   if (toDay) url.searchParams.set('toDay', toDay);
   if (status) url.searchParams.set('status', status);
@@ -558,7 +567,7 @@ async function openCustomerHistory(jid, name) {
   }
 
   try {
-    const url = new URL(API_URL);
+    const url = new URL(API_URL, window.location.origin);
     url.searchParams.set('customerJid', jid);
     url.searchParams.set('limit', '200');
     const response = await fetch(url, { headers: { Authorization: getAuthHeader() } });
