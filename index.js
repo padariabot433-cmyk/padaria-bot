@@ -126,7 +126,7 @@ app.get('/api/orders', adminAuth, async (req, res) => {
       await connectDB();
     }
 
-    const { limit = 50, status, day, fromDay, toDay, customerJid } = req.query;
+    const { limit = 500, status, day, fromDay, toDay, customerJid } = req.query;
     const query = {};
 
     if (status) {
