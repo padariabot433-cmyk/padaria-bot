@@ -1,0 +1,21 @@
+/* Dashboard-specific stylesheet
+   Imports base styles then provides small dashboard overrides. */
+@import './styles.css';
+
+/* Dashboard-only tweaks */
+main { max-width: 1100px; }
+
+/* Ensure revenue chart has a visible height on load */
+#revenueChart { height: 180px; display: block; }
+
+/* Slightly tighter summary cards on dashboard */
+.summary-card { padding: 0.9rem 1rem; }
+
+/* Make control group more compact on dashboard */
+.controls { gap: 0.6rem; }
+
+/* Improve empty state visuals inside dashboard panels */
+.items-chart-panel .empty, .sales-summary-panel .empty { padding: 1.4rem; color: var(--muted); }
+
+/* Keep login card centered nicely on dashboard */
+.login-card { max-width: 420px; }

@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Padaria — Dashboard</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23a8442e'/%3E%3Ctext x='50' y='62' font-size='56' text-anchor='middle' fill='white' font-family='sans-serif'%3E%F0%9F%8D%90%3C/text%3E%3C/svg%3E">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="dashboard.css">
+  </head>
+  <body>
+    <div id="loginScreen" class="login-screen">
+      <div class="login-card">
+        <h2>🔐 Acesso ao painel</h2>
+        <p>Digite a senha para ver o dashboard da padaria.</p>
+        <form id="loginForm" class="login-form">
+          <input id="senhaInput" type="password" placeholder="Senha do painel" autocomplete="current-password" />
+          <button type="submit">Entrar</button>
+          <div id="loginError" class="login-error"></div>
+        </form>
+      </div>
+    </div>
+
+    <div id="appContent" class="hidden">
+      <header>
+        <h1>📊 Padaria — Dashboard</h1>
+        <p>Totais de pedidos por período.</p>
+      </header>
+
+      <main>
+          <div class="controls">
+            <a href="index.html" class="button-link">← Voltar aos pedidos</a>
+            <select id="periodSelect" aria-label="Período">
+              <option value="24h">Últimas 24h</option>
+              <option value="week" selected>Esta semana</option>
+              <option value="month">Este mês</option>
+              <option value="year">Este ano</option>
+              <option value="custom">Personalizado</option>
+            </select>
+            <input id="startDate" type="date" class="hidden" aria-label="Data início" />
+            <input id="endDate" type="date" class="hidden" aria-label="Data fim" />
+            <button id="refresh" type="button">Atualizar</button>
+            <button id="exportCsv" type="button">Exportar CSV</button>
+            <label class="sound-toggle" title="Alternar tema">
+              <input id="darkToggle" type="checkbox" /> Tema escuro
+            </label>
+          </div>
+
+        <div class="summary">
+          <div class="summary-card">
+            <strong id="last24hTotal">R$ 0,00</strong>
+            <div class="muted">Últimas 24h (<span id="last24hCount">0</span> pedidos)</div>
+          </div>
+          <div class="summary-card">
+            <strong id="weekTotal">R$ 0,00</strong>
+            <div class="muted">Esta semana (<span id="weekCount">0</span> pedidos)</div>
+          </div>
+          <div class="summary-card">
+            <strong id="monthTotal">R$ 0,00</strong>
+            <div class="muted">Este mês (<span id="monthCount">0</span> pedidos)</div>
+          </div>
+          <div class="summary-card">
+            <strong id="yearTotal">R$ 0,00</strong>
+            <div class="muted">Este ano (<span id="yearCount">0</span> pedidos)</div>
+          </div>
+        </div>
+
+        <p class="muted">Pedidos cancelados não entram nesses totais. "Esta semana" considera de segunda-feira até agora.</p>
+
+        <section class="sales-summary-panel" aria-labelledby="revenueHeading">
+          <h3 id="revenueHeading" class="chart-title">Receita — Últimos 30 dias</h3>
+          <canvas id="revenueChart" height="120" aria-label="Gráfico de receita"></canvas>
+        </section>
+
+        <section class="items-chart-panel" aria-labelledby="topItemsHeading">
+          <h3 id="topItemsHeading" class="chart-title">Itens mais vendidos</h3>
+          <div id="topItems" class="chart-bars" role="list"></div>
+        </section>
+      </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="dashboard.js"></script>
+  </body>
+</html>

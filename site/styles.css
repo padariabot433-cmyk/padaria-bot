@@ -65,6 +65,19 @@ button {
   font-weight: 600;
 }
 button:hover { opacity: 0.92; }
+.button-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.65rem 0.9rem;
+  border-radius: 8px;
+  background: var(--accent);
+  color: white;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+.button-link:hover { opacity: 0.92; }
 .sound-toggle {
   display: flex;
   align-items: center;
@@ -918,4 +931,15 @@ button:hover { opacity: 0.92; }
   height: 18px;
   margin-right: 0.45rem;
   transform: translateY(1px);
+}
+
+:root[data-theme="dark"] {
+  --bg: #0f1112;
+  --card: #141618;
+  --text: #ede7df;
+  --muted: #bfb6a8;
+  --accent: #ff8a65;
+  --accent-2: #90be6d;
+  --wheat: #d89b3b;
+  --border: #222429;
 }

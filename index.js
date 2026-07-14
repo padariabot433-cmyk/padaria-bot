@@ -291,6 +291,52 @@ app.delete('/api/orders/:id', adminAuth, async (req, res) => {
   }
 });
 
+// Calcula o início da semana atual (segunda-feira, 00:00)
+function startOfWeek(date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  const day = d.getDay(); // 0 = domingo
+  const diffToMonday = (day + 6) % 7;
+  d.setDate(d.getDate() - diffToMonday);
+  return d;
+}
+
+// Resumo do dashboard: total de pedidos e faturamento por período
+// (últimas 24h, semana atual, mês atual, ano atual). Pedidos cancelados
+// não entram no total nem na contagem.
+app.get('/api/dashboard', adminAuth, async (req, res) => {
+  try {
+    if (mongoose.connection.readyState !== 1) {
+      await connectDB();
+    }
+
+    const now = new Date();
+    const periods = {
+      last24h: new Date(now.getTime() - 24 * 60 * 60 * 1000),
+      week: startOfWeek(now),
+      month: new Date(now.getFullYear(), now.getMonth(), 1),
+      year: new Date(now.getFullYear(), 0, 1),
+    };
+
+    const results = {};
+    for (const [key, since] of Object.entries(periods)) {
+      const orders = await Order.find({
+        createdAt: { $gte: since },
+        status: { $ne: 'cancelado' },
+      });
+      results[key] = {
+        count: orders.length,
+        total: orders.reduce((sum, o) => sum + Number(o.total || 0), 0),
+      };
+    }
+
+    res.json({ ...results, generatedAt: now });
+  } catch (error) {
+    console.error('Erro ao gerar resumo do dashboard:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Página simples para escanear o QR code sem precisar olhar o terminal
 app.get('/qr', async (req, res) => {
   if (connectionStatus === 'conectado') {
