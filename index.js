@@ -7,14 +7,14 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import makeWASocket, { DisconnectReason, fetchLatestBaileysVersion } from '@whiskeysockets/baileys';
 
-import { connectDB, Order, Customer } from './src/db.js';
-import { useMongoAuthState } from './src/authState.js';
-import { handleMessage } from './src/orderFlow.js';
-import { adminAuth } from './src/adminAuth.js';
-import { menuRouter } from './src/menuRoutes.js';
-import { startDailyReminder } from './src/dailyReminder.js';
-import { startWeeklyBackup } from './src/backup.js';
-import { createBotInstanceId, acquireBotLock, refreshBotLock, releaseBotLock } from './src/botLock.js';
+import { connectDB, Order, Customer } from './src/core/db.js';
+import { useMongoAuthState } from './src/bot/authState.js';
+import { handleMessage } from './src/bot/orderFlow.js';
+import { adminAuth } from './src/admin/adminAuth.js';
+import { menuRouter } from './src/menu/menuRoutes.js';
+import { startDailyReminder } from './src/bot/dailyReminder.js';
+import { startWeeklyBackup } from './src/bot/backup.js';
+import { createBotInstanceId, acquireBotLock, refreshBotLock, releaseBotLock } from './src/bot/botLock.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
@@ -137,7 +137,7 @@ app.patch('/api/orders/:id', adminAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const updates = {};
-    const allowed = ['customerName', 'customerJid', 'address', 'status', 'items', 'total'];
+    const allowed = ['customerName', 'customerJid', 'address', 'status', 'items', 'total', 'valorPago'];
 
     for (const key of allowed) {
       if (req.body[key] !== undefined) {
@@ -155,6 +155,14 @@ app.patch('/api/orders/:id', adminAuth, async (req, res) => {
 
     if (updates.items && !updates.total) {
       updates.total = updates.items.reduce((sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0), 0);
+    }
+
+    if (updates.valorPago !== undefined) {
+      const parsed = Number(updates.valorPago);
+      if (Number.isNaN(parsed) || parsed < 0) {
+        return res.status(400).json({ error: 'Valor pago inválido.' });
+      }
+      updates.valorPago = parsed;
     }
 
     const order = await Order.findById(id);
