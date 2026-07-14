@@ -136,6 +136,15 @@
       revenueChart = null;
     }
 
+    // adapt colors based on current theme
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const gridColor = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.06)';
+    const tickColor = isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.85)';
+    const areaBg = isDark ? 'rgba(168,68,46,0.06)' : 'rgba(168,68,46,0.08)';
+
+    const maxVal = Math.max.apply(null, sums.map(function (v) { return Math.round(v * 100) / 100; })) || 0;
+    const suggestedMax = Math.max(Math.ceil(maxVal * 1.2), 1);
+
     revenueChart = new Chart(revenueCtx, {
       type: 'line',
       data: {
@@ -145,7 +154,7 @@
             label: 'Receita (R$)',
             data: sums.map(function (v) { return Math.round(v * 100) / 100; }),
             borderColor: '#a8442e',
-            backgroundColor: 'rgba(168,68,46,0.08)',
+            backgroundColor: areaBg,
             tension: 0.2,
             fill: true
           }
@@ -159,9 +168,18 @@
         },
         scales: {
           y: {
+            beginAtZero: true,
+            suggestedMax: suggestedMax,
             ticks: {
-              callback: function (v) { return formatCurrency(v); }
-            }
+              callback: function (v) { return formatCurrency(v); },
+              color: tickColor
+            },
+            grid: { color: gridColor }
+          }
+          ,
+          x: {
+            ticks: { color: tickColor },
+            grid: { color: 'transparent' }
           }
         }
       }
