@@ -14,6 +14,7 @@ body {
   font-family: 'Work Sans', sans-serif;
   background: var(--bg);
   color: var(--text);
+  overflow-x: hidden;
 }
 header {
   background: var(--text);
@@ -50,7 +51,7 @@ input, select, button {
   border-radius: 8px;
   border: 1px solid var(--border);
   font-family: inherit;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
 }
 input, select {
   min-width: 180px;
@@ -518,6 +519,142 @@ button:hover { opacity: 0.92; }
   background: var(--accent-2);
   color: white;
   border-color: var(--accent-2);
+}
+
+@media (max-width: 768px) {
+  main {
+    padding: 0 0.8rem 2.2rem;
+  }
+
+  header {
+    padding: 1.2rem 0.8rem 1.3rem;
+  }
+
+  .controls {
+    padding: 0.8rem;
+    gap: 0.6rem;
+  }
+
+  .controls > * {
+    width: 100%;
+    flex-basis: 100%;
+  }
+
+  .controls input,
+  .controls select,
+  .controls button,
+  .controls .sound-toggle {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .controls .sound-toggle {
+    justify-content: center;
+    padding: 0.2rem 0;
+  }
+
+  .summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.7rem;
+  }
+
+  .sales-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .orders {
+    grid-template-columns: 1fr;
+  }
+
+  .order-top,
+  .order-body,
+  .card-actions,
+  .status-actions,
+  .order-details,
+  .edit-panel {
+    padding-left: 0.95rem;
+    padding-right: 0.95rem;
+  }
+
+  .status-actions {
+    gap: 0.4rem;
+  }
+
+  .status-button {
+    flex: 1 1 calc(50% - 0.25rem);
+  }
+
+  .card-actions,
+  .edit-actions {
+    flex-direction: column;
+  }
+
+  .card-actions button,
+  .edit-actions button {
+    width: 100%;
+    flex-basis: 100%;
+  }
+
+  .modal-box {
+    width: min(94vw, 560px);
+    max-height: 90vh;
+    overflow: auto;
+    border-radius: 16px;
+  }
+
+  .modal-header,
+  .modal-body {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .order-edit-item-main {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .order-edit-item-controls {
+    justify-content: space-between;
+  }
+
+  .order-edit-item-adder {
+    flex-direction: column;
+  }
+
+  .order-edit-item-adder > * {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  header h1 {
+    font-size: 1.4rem;
+  }
+
+  .summary {
+    grid-template-columns: 1fr;
+  }
+
+  .summary-card strong {
+    font-size: 1.3rem;
+  }
+
+  .controls input,
+  .controls select,
+  .controls button {
+    font-size: 16px;
+  }
+
+  .order-edit-item-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .order-edit-item-controls input,
+  .order-edit-item-controls button,
+  .order-edit-item-price {
+    width: 100%;
+  }
 }
 
 .menu-section {
