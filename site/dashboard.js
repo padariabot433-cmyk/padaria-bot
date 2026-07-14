@@ -176,6 +176,7 @@ async function loadDashboard(isLoginAttempt = false) {
   lastSelected = data.selected || { dailyRevenue: [], topItems: [] };
   renderRevenueChart(lastSelected.dailyRevenue);
   renderTopItems(lastSelected.topItems);
+  updateFloatingBadge();
 }
 
 function tryLogin(password) {
@@ -243,4 +244,114 @@ document.addEventListener('DOMContentLoaded', () => {
   } else {
     showLogin();
   }
+
+  // update badge initially (in case data is already loaded)
+  updateFloatingBadge();
+
+  // Quick actions: move controls into floating menu when toggled
+  const quickBtn = document.getElementById('quickActionsBtn');
+  const quickMenu = document.getElementById('quickActionsMenu');
+  const controlsPlaceholder = document.getElementById('controlsPlaceholder');
+  const controlsEl = controlsPlaceholder ? controlsPlaceholder.querySelector('.controls') : null;
+
+  const quickOverlay = document.getElementById('quickActionsOverlay');
+
+  function closeQuickMenu() {
+    if (!quickMenu || !controlsPlaceholder || !controlsEl) return;
+    quickMenu.classList.remove('side-open');
+    quickMenu.classList.add('side-closed');
+    quickMenu.setAttribute('aria-hidden', 'true');
+    quickBtn.setAttribute('aria-expanded', 'false');
+    if (quickOverlay) quickOverlay.classList.remove('visible');
+    // move controls back after animation completes
+    setTimeout(() => {
+      try { controlsPlaceholder.appendChild(controlsEl); } catch (e) {}
+    }, 350);
+  }
+
+  function openQuickMenu() {
+    if (!quickMenu || !controlsPlaceholder || !controlsEl) return;
+    quickMenu.classList.remove('side-closed');
+    quickMenu.classList.add('side-open');
+    quickMenu.setAttribute('aria-hidden', 'false');
+    quickBtn.setAttribute('aria-expanded', 'true');
+    if (quickOverlay) quickOverlay.classList.add('visible');
+    // move controls into menu
+    quickMenu.appendChild(controlsEl);
+  }
+
+  if (quickBtn) {
+    quickBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!quickMenu) return;
+      if (quickMenu.classList.contains('hidden')) openQuickMenu(); else closeQuickMenu();
+    });
+    // close when clicking outside or on overlay
+    document.addEventListener('click', (ev) => {
+      if (!quickMenu) return;
+      if (quickMenu.classList.contains('side-closed')) return;
+      if (!quickMenu.contains(ev.target) && ev.target !== quickBtn) closeQuickMenu();
+    });
+    if (quickOverlay) quickOverlay.addEventListener('click', closeQuickMenu);
+  }
+
+  // Floating bottom bar (center) and minimize to dot
+  const floatingBar = document.getElementById('floatingBar');
+  const floatingBarContent = document.getElementById('floatingBarContent');
+  const floatingBarClose = document.getElementById('floatingBarClose');
+  const floatingDot = document.getElementById('floatingDot');
+
+  function showFloatingBar() {
+    if (!floatingBar || !controlsPlaceholder || !controlsEl) return;
+    // ensure controls are available
+    try { floatingBarContent.appendChild(controlsEl); } catch (e) {}
+    floatingBar.classList.remove('hidden');
+    if (floatingDot) floatingDot.classList.add('hidden');
+    // animate children with stagger
+    try {
+      const children = Array.from(controlsEl.children || []);
+      children.forEach((ch, i) => {
+        ch.style.transition = 'opacity 320ms ease, transform 320ms ease';
+        ch.style.opacity = '0';
+        ch.style.transform = 'translateY(10px)';
+      });
+      // force reflow then play
+      void controlsEl.offsetHeight;
+      children.forEach((ch, i) => {
+        ch.style.transitionDelay = (i * 60) + 'ms';
+        ch.style.opacity = '1';
+        ch.style.transform = 'translateY(0)';
+      });
+    } catch (e) {}
+  }
+
+  function minimizeFloatingBar() {
+    if (!floatingBar || !controlsPlaceholder || !controlsEl) return;
+    floatingBar.classList.add('hidden');
+    // move controls back to placeholder after animation
+    setTimeout(() => {
+      try { controlsPlaceholder.appendChild(controlsEl); } catch (e) {}
+    }, 300);
+    if (floatingDot) floatingDot.classList.remove('hidden');
+  }
+
+  function updateFloatingBadge() {
+    const badge = document.getElementById('floatingBadge');
+    if (!badge) return;
+    const count = (lastSelected && Array.isArray(lastSelected.topItems)) ? lastSelected.topItems.length : 0;
+    if (count > 0) {
+      badge.textContent = String(count);
+      badge.classList.remove('hidden');
+    } else {
+      badge.classList.add('hidden');
+    }
+  }
+
+  // Close button minimizes to dot
+  if (floatingBarClose) floatingBarClose.addEventListener('click', minimizeFloatingBar);
+  // Dot restores the bar
+  if (floatingDot) floatingDot.addEventListener('click', (e) => { e.stopPropagation(); showFloatingBar(); });
+
+  // Start with bar visible if controls exist
+  if (controlsEl && floatingBar) showFloatingBar();
 });

@@ -26,10 +26,12 @@
       <header>
         <h1>📊 Padaria — Dashboard</h1>
         <p>Totais de pedidos por período.</p>
+        <button id="quickActionsBtn" class="quick-actions-button" aria-haspopup="true" aria-expanded="false">☰ Ações</button>
       </header>
 
       <main>
-          <div class="controls">
+          <div id="controlsPlaceholder">
+            <div class="controls">
             <a href="index.html" class="button-link">← Voltar aos pedidos</a>
             <select id="periodSelect" aria-label="Período">
               <option value="24h">Últimas 24h</option>
@@ -45,6 +47,7 @@
             <label class="sound-toggle" title="Alternar tema">
               <input id="darkToggle" type="checkbox" /> Tema escuro
             </label>
+            </div>
           </div>
 
         <div class="summary">
@@ -82,6 +85,19 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <div id="quickActionsOverlay" class="quick-actions-overlay hidden" aria-hidden="true"></div>
+    <div id="quickActionsMenu" class="quick-actions-menu side-closed" role="menu" aria-hidden="true"></div>
+    <!-- Floating bar (center bottom) and minimized dot -->
+    <div id="floatingBar" class="floating-bar" aria-hidden="false">
+      <div class="floating-bar-inner">
+        <button id="floatingBarClose" class="floating-bar-close" aria-label="Fechar">✕</button>
+        <div id="floatingBarContent" class="floating-bar-content"></div>
+      </div>
+    </div>
+    <button id="floatingDot" class="floating-dot hidden" aria-label="Abrir ações">
+      <span class="dot-icon">☰</span>
+      <span id="floatingBadge" class="dot-badge hidden">0</span>
+    </button>
     <script src="dashboard.js"></script>
   </body>
 </html>

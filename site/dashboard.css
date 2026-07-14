@@ -27,3 +27,140 @@ main { max-width: 1100px; }
 
 /* Keep login card centered nicely on dashboard */
 .login-card { max-width: 420px; }
+
+/* Header contrast fix for dark theme */
+:root[data-theme="dark"] header {
+  background: #0f1112;
+  color: #f6f3ef;
+}
+:root[data-theme="dark"] header p { color: var(--muted); }
+
+/* Controls and buttons in dark mode */
+:root[data-theme="dark"] .controls {
+  background: #161719;
+  box-shadow: 0 6px 22px rgba(0,0,0,0.5);
+  border: 1px solid rgba(255,255,255,0.03);
+}
+:root[data-theme="dark"] .controls input,
+:root[data-theme="dark"] .controls select,
+:root[data-theme="dark"] .controls button,
+:root[data-theme="dark"] .button-link {
+  background: transparent;
+  color: var(--text);
+  border-color: var(--border);
+}
+:root[data-theme="dark"] .button-link,
+:root[data-theme="dark"] .controls button {
+  background: var(--accent);
+  color: white;
+  border-color: transparent;
+}
+:root[data-theme="dark"] .button-link:hover,
+:root[data-theme="dark"] .controls button:hover {
+  opacity: 0.95;
+  transform: translateY(-1px);
+}
+
+/* Quick actions floating button and menu */
+.quick-actions-button {
+  position: absolute;
+  right: 1rem;
+  top: 1.2rem;
+  background: var(--accent);
+  color: white;
+  border: none;
+  padding: 0.6rem 0.9rem;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.15);
+}
+
+.quick-actions-menu {
+  position: fixed;
+  right: 0;
+  top: 0;
+  height: 100vh;
+  width: min(420px, 92vw);
+  overflow: auto;
+  background: var(--card);
+  border-radius: 12px 0 0 12px;
+  box-shadow: -12px 0 48px rgba(0,0,0,0.35);
+  padding: 1rem;
+  z-index: 120;
+}
+.quick-actions-menu.side-closed { transform: translateX(110%); transition: transform 320ms cubic-bezier(.2,.9,.2,1); }
+.quick-actions-menu.side-open { transform: translateX(0); transition: transform 320ms cubic-bezier(.2,.9,.2,1); }
+.quick-actions-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 110; opacity: 0; pointer-events: none; transition: opacity 200ms ease; }
+.quick-actions-overlay.visible { opacity: 1; pointer-events: auto; }
+
+/* Ensure controls inside menu match layout */
+.quick-actions-menu .controls { margin: 0; }
+
+/* Floating center-bottom bar */
+.floating-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  width: min(980px, 96%);
+  max-width: 1100px;
+  background: var(--card);
+  border-radius: 14px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.28);
+  z-index: 140;
+  transition: transform 300ms ease, opacity 200ms ease;
+}
+.floating-bar.hidden { transform: translateX(-50%) translateY(120%); opacity: 0; pointer-events: none; }
+.floating-bar-inner { position: relative; padding: 0.8rem; }
+.floating-bar-close { position: absolute; right: 8px; top: 8px; background: transparent; border: none; font-size: 1.1rem; cursor: pointer; color: var(--muted); }
+.floating-bar-content { padding-top: 1.6rem; }
+
+/* Minimized dot in bottom-right */
+.floating-dot {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: white;
+  display: grid;
+  place-items: center;
+  z-index: 150;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 8px 22px rgba(0,0,0,0.25);
+  transition: transform 180ms ease;
+}
+.floating-dot.hidden { display: none; }
+.floating-dot:active { transform: scale(0.95); }
+
+/* Dot badge */
+.dot-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #ff4d4f;
+  color: white;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+}
+.dot-badge.hidden { display: none; }
+
+/* Controls child animation helper */
+.controls > * { opacity: 1; transform: none; }
+
+/* Make the floating bar compact on small screens */
+@media (max-width: 720px) {
+  .floating-bar { width: 96%; bottom: 12px; border-radius: 12px; }
+  .floating-bar-content { padding-top: 1rem; }
+}
