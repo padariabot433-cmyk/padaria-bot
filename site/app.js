@@ -293,6 +293,99 @@ function initials(name) {
   return name.trim().split(/\s+/).slice(0, 2).map((p) => p[0].toUpperCase()).join('');
 }
 
+function escapeHtmlGlobal(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+async function openCustomerHistory(jid, name) {
+  const modal = document.getElementById('historyModal');
+  const modalName = document.getElementById('historyModalName');
+  const modalBody = document.getElementById('historyModalBody');
+
+  modalName.textContent = `Histórico de ${name || 'cliente sem nome'}`;
+  modalBody.innerHTML = '<p class="muted">Carregando histórico...</p>';
+  modal.classList.remove('hidden');
+
+  if (!jid) {
+    modalBody.innerHTML = '<p class="muted">Este pedido não tem um telefone/JID associado.</p>';
+    return;
+  }
+
+  try {
+    const url = new URL(API_URL);
+    url.searchParams.set('customerJid', jid);
+    url.searchParams.set('limit', '200');
+    const response = await fetch(url, { headers: { Authorization: getAuthHeader() } });
+    if (!response.ok) {
+      modalBody.innerHTML = '<p class="muted">Não foi possível carregar o histórico.</p>';
+      return;
+    }
+    const orders = await response.json();
+    renderCustomerHistory(orders);
+  } catch (err) {
+    console.error('Erro ao carregar histórico do cliente:', err);
+    modalBody.innerHTML = '<p class="muted">Erro de conexão ao carregar o histórico.</p>';
+  }
+}
+
+function renderCustomerHistory(orders) {
+  const modalBody = document.getElementById('historyModalBody');
+
+  if (!orders.length) {
+    modalBody.innerHTML = '<p class="muted">Nenhum pedido encontrado para este cliente.</p>';
+    return;
+  }
+
+  const totalGasto = orders.reduce((sum, o) => sum + Number(o.total || 0), 0);
+  const totalPago = orders.reduce((sum, o) => sum + Number(o.valorPago || 0), 0);
+
+  modalBody.innerHTML = `
+    <div class="history-summary">
+      <span><b>${orders.length}</b> pedido(s)</span>
+      <span>Total gasto: <b>${formatCurrency(totalGasto)}</b></span>
+      <span>Total pago: <b>${formatCurrency(totalPago)}</b></span>
+    </div>
+    <div class="history-list">
+      ${orders.map((order) => {
+        const items = order.items?.map((item) => {
+          const qty = item.quantity === 1 ? '1 pacote' : `${item.quantity} pacotes`;
+          return `<li><span>${escapeHtmlGlobal(`${qty} de ${item.name}`)}</span><span>${formatCurrency(item.price * item.quantity)}</span></li>`;
+        }).join('') || '';
+        const statusLabel = STATUS_LABELS[order.status] || escapeHtmlGlobal(order.status);
+        const valorPago = Number(order.valorPago || 0);
+        const falta = Math.max(Number(order.total || 0) - valorPago, 0);
+        const paymentInfo = valorPago > 0
+          ? `<div class="history-payment">Pago: ${formatCurrency(valorPago)} · Falta: ${formatCurrency(falta)}</div>`
+          : '';
+
+        return `
+          <div class="history-item status-${escapeHtmlGlobal(order.status)}">
+            <div class="history-item-top">
+              <span class="history-date">${escapeHtmlGlobal(new Date(order.createdAt).toLocaleString('pt-BR'))}</span>
+              <span class="status">${escapeHtmlGlobal(statusLabel)}</span>
+            </div>
+            <ul class="order-items">${items}</ul>
+            <div class="order-total-row">
+              <span class="label">Total do pedido</span>
+              <span class="value">${formatCurrency(order.total)}</span>
+            </div>
+            ${paymentInfo}
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+function closeHistoryModal() {
+  document.getElementById('historyModal').classList.add('hidden');
+}
+
 function renderOrders(orders) {
   currentOrders = orders;
   orders.forEach((o) => knownOrderIds.add(String(o._id)));
@@ -351,7 +444,7 @@ function renderFilteredOrders() {
       <article class="order-card status-${escapeHtml(order.status)}">
         <div class="order-top">
           <div class="avatar">${escapeHtml(initials(order.customerName || 'Cliente sem nome'))}</div>
-          <div class="order-who">
+          <div class="order-who customer-link" data-jid="${escapeHtml(order.customerJid || '')}" data-name="${escapeHtml(order.customerName || '')}" title="Ver histórico deste cliente">
             <div class="order-name">${name}</div>
             <div class="order-phone">📱 ${escapeHtml(formatPhone(order.customerJid))}</div>
           </div>
@@ -460,6 +553,17 @@ document.addEventListener('DOMContentLoaded', () => {
 document.addEventListener('click', async (event) => {
   if (event.target.id === 'refresh') {
     loadOrders();
+    return;
+  }
+
+  const customerTrigger = event.target.closest('.customer-link');
+  if (customerTrigger) {
+    openCustomerHistory(customerTrigger.dataset.jid, customerTrigger.dataset.name);
+    return;
+  }
+
+  if (event.target.id === 'closeHistoryModal' || event.target.id === 'historyModal') {
+    closeHistoryModal();
     return;
   }
 

@@ -110,11 +110,15 @@ app.get('/api/orders', adminAuth, async (req, res) => {
       await connectDB();
     }
 
-    const { limit = 50, status, day } = req.query;
+    const { limit = 50, status, day, customerJid } = req.query;
     const query = {};
 
     if (status) {
       query.status = status;
+    }
+
+    if (customerJid) {
+      query.customerJid = customerJid;
     }
 
     if (day) {
