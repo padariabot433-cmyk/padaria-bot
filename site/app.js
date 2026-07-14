@@ -810,6 +810,7 @@ function renderFilteredOrders() {
   document.getElementById('count').textContent = orders.length;
   document.getElementById('pendentes').textContent = orders.filter((o) => o.status === 'pendente').length;
   document.getElementById('total').textContent = formatCurrency(orders.reduce((sum, o) => sum + Number(o.total || 0), 0));
+  if (typeof window.updateFloatingBadge === 'function') window.updateFloatingBadge();
 
   if (!orders.length) {
     container.innerHTML = '<div class="empty">Nenhum pedido encontrado.</div>';
@@ -1004,6 +1005,104 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   loadPage();
+
+  // Quick actions: move controls into a slide-in side menu when toggled
+  const quickBtn = document.getElementById('quickActionsBtn');
+  const quickMenu = document.getElementById('quickActionsMenu');
+  const controlsPlaceholder = document.getElementById('controlsPlaceholder');
+  const controlsEl = controlsPlaceholder ? controlsPlaceholder.querySelector('.controls') : null;
+  const quickOverlay = document.getElementById('quickActionsOverlay');
+
+  function closeQuickMenu() {
+    if (!quickMenu || !controlsPlaceholder || !controlsEl) return;
+    quickMenu.classList.remove('side-open');
+    quickMenu.classList.add('side-closed');
+    quickMenu.setAttribute('aria-hidden', 'true');
+    quickBtn.setAttribute('aria-expanded', 'false');
+    if (quickOverlay) quickOverlay.classList.remove('visible');
+    setTimeout(() => {
+      try { controlsPlaceholder.appendChild(controlsEl); } catch (e) {}
+    }, 350);
+  }
+
+  function openQuickMenu() {
+    if (!quickMenu || !controlsPlaceholder || !controlsEl) return;
+    quickMenu.classList.remove('side-closed');
+    quickMenu.classList.add('side-open');
+    quickMenu.setAttribute('aria-hidden', 'false');
+    quickBtn.setAttribute('aria-expanded', 'true');
+    if (quickOverlay) quickOverlay.classList.add('visible');
+    quickMenu.appendChild(controlsEl);
+  }
+
+  if (quickBtn) {
+    quickBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!quickMenu) return;
+      if (quickMenu.classList.contains('side-closed')) openQuickMenu(); else closeQuickMenu();
+    });
+    document.addEventListener('click', (ev) => {
+      if (!quickMenu) return;
+      if (quickMenu.classList.contains('side-closed')) return;
+      if (!quickMenu.contains(ev.target) && ev.target !== quickBtn) closeQuickMenu();
+    });
+    if (quickOverlay) quickOverlay.addEventListener('click', closeQuickMenu);
+  }
+
+  // Floating bottom-center bar and its minimized dot
+  const floatingBar = document.getElementById('floatingBar');
+  const floatingBarContent = document.getElementById('floatingBarContent');
+  const floatingBarClose = document.getElementById('floatingBarClose');
+  const floatingDot = document.getElementById('floatingDot');
+
+  function showFloatingBar() {
+    if (!floatingBar || !controlsPlaceholder || !controlsEl) return;
+    try { floatingBarContent.appendChild(controlsEl); } catch (e) {}
+    floatingBar.classList.remove('hidden');
+    if (floatingDot) floatingDot.classList.add('hidden');
+    try {
+      const children = Array.from(controlsEl.children || []);
+      children.forEach((ch) => {
+        ch.style.transition = 'opacity 320ms ease, transform 320ms ease';
+        ch.style.opacity = '0';
+        ch.style.transform = 'translateY(10px)';
+      });
+      void controlsEl.offsetHeight;
+      children.forEach((ch, i) => {
+        ch.style.transitionDelay = (i * 60) + 'ms';
+        ch.style.opacity = '1';
+        ch.style.transform = 'translateY(0)';
+      });
+    } catch (e) {}
+  }
+
+  function minimizeFloatingBar() {
+    if (!floatingBar || !controlsPlaceholder || !controlsEl) return;
+    floatingBar.classList.add('hidden');
+    setTimeout(() => {
+      try { controlsPlaceholder.appendChild(controlsEl); } catch (e) {}
+    }, 300);
+    if (floatingDot) floatingDot.classList.remove('hidden');
+  }
+
+  window.updateFloatingBadge = function updateFloatingBadge() {
+    const badge = document.getElementById('floatingBadge');
+    if (!badge) return;
+    const pendentesEl = document.getElementById('pendentes');
+    const count = pendentesEl ? Number(pendentesEl.textContent) || 0 : 0;
+    if (count > 0) {
+      badge.textContent = String(count);
+      badge.classList.remove('hidden');
+    } else {
+      badge.classList.add('hidden');
+    }
+  };
+
+  if (floatingBarClose) floatingBarClose.addEventListener('click', minimizeFloatingBar);
+  if (floatingDot) floatingDot.addEventListener('click', (e) => { e.stopPropagation(); showFloatingBar(); });
+
+  if (controlsEl && floatingBar) showFloatingBar();
+  window.updateFloatingBadge();
 });
 
 document.addEventListener('click', async (event) => {

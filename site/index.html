@@ -27,9 +27,11 @@
       <header>
         <h1>🥖 Padaria — Pedidos</h1>
         <p>Visualize os pedidos do banco em tempo real.</p>
+        <button id="quickActionsBtn" class="quick-actions-button" aria-haspopup="true" aria-expanded="false">☰ Ações</button>
       </header>
 
       <main>
+        <div id="controlsPlaceholder">
         <div class="controls">
           <input id="search" type="text" placeholder="Buscar por nome ou telefone..." />
           <div class="day-nav">
@@ -59,6 +61,7 @@
           </label>
           <button id="toggleMenu" type="button">🥖 Cardápio</button>
           <a href="dashboard.html" class="button-link">📊 Dashboard</a>
+        </div>
         </div>
 
         <div id="menuSection" class="menu-section hidden">
@@ -164,6 +167,19 @@
       </div>
     </div>
 
+    <div id="quickActionsOverlay" class="quick-actions-overlay hidden" aria-hidden="true"></div>
+    <div id="quickActionsMenu" class="quick-actions-menu side-closed" role="menu" aria-hidden="true"></div>
+    <!-- Floating bar (center bottom) and minimized dot -->
+    <div id="floatingBar" class="floating-bar" aria-hidden="false">
+      <div class="floating-bar-inner">
+        <button id="floatingBarClose" class="floating-bar-close" aria-label="Fechar">✕</button>
+        <div id="floatingBarContent" class="floating-bar-content"></div>
+      </div>
+    </div>
+    <button id="floatingDot" class="floating-dot hidden" aria-label="Abrir ações">
+      <span class="dot-icon">☰</span>
+      <span id="floatingBadge" class="dot-badge hidden">0</span>
+    </button>
     <script src="app.js"></script>
   </body>
 </html>
