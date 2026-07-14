@@ -297,6 +297,8 @@ function exportOrdersToCsv() {
     return;
   }
 
+  const asExcelText = (value) => `="${String(value).replace(/"/g, '""')}"`;
+
   const headers = ['ID', 'Cliente', 'Telefone', 'Status', 'Total', 'Pago', 'Falta', 'Data', 'Itens'];
   const rows = orders.map((order) => {
     const items = (order.items || []).map((item) => `${item.quantity}x ${item.name}`).join(' | ');
@@ -304,9 +306,9 @@ function exportOrdersToCsv() {
     const valorPago = Number(order.valorPago || 0).toFixed(2);
     const falta = Math.max(Number(order.total || 0) - Number(order.valorPago || 0), 0).toFixed(2);
     return [
-      String(order._id),
+      asExcelText(order._id),
       order.customerName || '',
-      order.customerJid || '',
+      asExcelText(order.customerJid || ''),
       STATUS_LABELS[order.status] || order.status,
       total,
       valorPago,
@@ -317,10 +319,14 @@ function exportOrdersToCsv() {
   });
 
   const csvContent = [headers, ...rows]
-    .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+    .map((row) => row.map((cell) => {
+      if (String(cell).startsWith('="')) return cell;
+      return `"${String(cell).replace(/"/g, '""')}"`;
+    }).join(','))
     .join('\n');
 
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const BOM = '\uFEFF';
+  const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
