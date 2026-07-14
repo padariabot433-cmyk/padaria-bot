@@ -227,10 +227,12 @@ async function loadPage() {
 }
 
 async function loadOrders(isLoginAttempt = false) {
-  const day = document.getElementById('day').value;
+  const fromDay = document.getElementById('fromDay').value;
+  const toDay = document.getElementById('toDay').value;
   const status = document.getElementById('status').value;
   const url = new URL(API_URL);
-  if (day) url.searchParams.set('day', day);
+  if (fromDay) url.searchParams.set('fromDay', fromDay);
+  if (toDay) url.searchParams.set('toDay', toDay);
   if (status) url.searchParams.set('status', status);
 
   const errorEl = document.getElementById('loginError');
@@ -286,6 +288,47 @@ function formatPhone(jid) {
   const rest = digits.slice(4);
   const half = rest.length > 8 ? rest.length - 4 : Math.ceil(rest.length / 2);
   return `(${ddd}) ${rest.slice(0, half)}-${rest.slice(half)}`;
+}
+
+function exportOrdersToCsv() {
+  const orders = currentOrders;
+  if (!orders.length) {
+    alert('Não há pedidos para exportar.');
+    return;
+  }
+
+  const headers = ['ID', 'Cliente', 'Telefone', 'Status', 'Total', 'Pago', 'Falta', 'Data', 'Itens'];
+  const rows = orders.map((order) => {
+    const items = (order.items || []).map((item) => `${item.quantity}x ${item.name}`).join(' | ');
+    const total = Number(order.total || 0).toFixed(2);
+    const valorPago = Number(order.valorPago || 0).toFixed(2);
+    const falta = Math.max(Number(order.total || 0) - Number(order.valorPago || 0), 0).toFixed(2);
+    return [
+      String(order._id),
+      order.customerName || '',
+      order.customerJid || '',
+      STATUS_LABELS[order.status] || order.status,
+      total,
+      valorPago,
+      falta,
+      new Date(order.createdAt).toLocaleString('pt-BR'),
+      items,
+    ];
+  });
+
+  const csvContent = [headers, ...rows]
+    .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+    .join('\n');
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `pedidos-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }
 
 function initials(name) {
@@ -390,6 +433,24 @@ function renderOrders(orders) {
   currentOrders = orders;
   orders.forEach((o) => knownOrderIds.add(String(o._id)));
   renderFilteredOrders();
+  renderSalesSummary(orders);
+}
+
+function renderSalesSummary(orders) {
+  const totalRevenue = orders.reduce((sum, o) => sum + Number(o.total || 0), 0);
+  const totalPaid = orders.reduce((sum, o) => sum + Number(o.valorPago || 0), 0);
+  const totalDue = orders.reduce((sum, o) => sum + Math.max(Number(o.total || 0) - Number(o.valorPago || 0), 0), 0);
+
+  const summaryHtml = `
+    <div class="sales-summary">
+      <div><strong>${formatCurrency(totalRevenue)}</strong><span>Total vendido</span></div>
+      <div><strong>${formatCurrency(totalPaid)}</strong><span>Total pago</span></div>
+      <div><strong>${formatCurrency(totalDue)}</strong><span>Total em aberto</span></div>
+    </div>
+  `;
+
+  const summaryContainer = document.getElementById('salesSummary');
+  if (summaryContainer) summaryContainer.innerHTML = summaryHtml;
 }
 
 function renderFilteredOrders() {
@@ -547,6 +608,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  document.getElementById('exportCsv').addEventListener('click', () => {
+    exportOrdersToCsv();
+  });
+
   loadPage();
 });
 
@@ -699,7 +764,7 @@ document.addEventListener('click', async (event) => {
 });
 
 document.addEventListener('change', (event) => {
-  if (event.target.id === 'day' || event.target.id === 'status') {
+  if (['fromDay', 'toDay', 'status'].includes(event.target.id)) {
     loadOrders();
   }
 });

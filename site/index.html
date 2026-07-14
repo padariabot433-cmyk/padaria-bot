@@ -30,7 +30,8 @@
       <main>
         <div class="controls">
           <input id="search" type="text" placeholder="Buscar por nome ou telefone..." />
-          <input id="day" type="date" />
+          <input id="fromDay" type="date" aria-label="Data início" />
+          <input id="toDay" type="date" aria-label="Data fim" />
           <select id="status">
             <option value="">Todos</option>
             <option value="pendente">Pendente</option>
@@ -41,6 +42,7 @@
             <option value="cancelado">Cancelado</option>
           </select>
           <button id="refresh">Atualizar</button>
+          <button id="exportCsv" type="button">Exportar CSV</button>
           <label class="sound-toggle">
             <input id="soundToggle" type="checkbox" checked />
             🔔 Som de novo pedido
@@ -77,6 +79,8 @@
             <div class="muted">Total</div>
           </div>
         </div>
+
+        <div id="salesSummary" class="sales-summary-panel"></div>
 
         <div id="orders" class="orders"></div>
       </main>

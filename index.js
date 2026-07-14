@@ -110,7 +110,7 @@ app.get('/api/orders', adminAuth, async (req, res) => {
       await connectDB();
     }
 
-    const { limit = 50, status, day, customerJid } = req.query;
+    const { limit = 50, status, day, fromDay, toDay, customerJid } = req.query;
     const query = {};
 
     if (status) {
@@ -121,7 +121,21 @@ app.get('/api/orders', adminAuth, async (req, res) => {
       query.customerJid = customerJid;
     }
 
-    if (day) {
+    // Filtro por período (fromDay/toDay) usado pelo seletor de datas do painel.
+    // Mantemos "day" (dia único) por compatibilidade com quem ainda usa o link antigo.
+    if (fromDay || toDay) {
+      query.createdAt = {};
+      if (fromDay) {
+        const start = new Date(fromDay);
+        start.setHours(0, 0, 0, 0);
+        query.createdAt.$gte = start;
+      }
+      if (toDay) {
+        const end = new Date(toDay);
+        end.setHours(23, 59, 59, 999);
+        query.createdAt.$lte = end;
+      }
+    } else if (day) {
       const start = new Date(day);
       start.setHours(0, 0, 0, 0);
       const end = new Date(day);

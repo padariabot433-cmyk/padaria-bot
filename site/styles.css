@@ -92,6 +92,34 @@ button:hover { opacity: 0.92; }
   font-size: 1.6rem;
 }
 .summary-card .muted { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; }
+.sales-summary-panel {
+  background: var(--card);
+  padding: 1.1rem 1.3rem;
+  border-radius: 14px;
+  box-shadow: 0 4px 16px rgba(62,39,35,0.08);
+  margin-bottom: 1rem;
+}
+.sales-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+}
+.sales-summary div {
+  background: #fff8f2;
+  padding: 0.9rem 1rem;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+.sales-summary div strong {
+  display: block;
+  font-family: 'Fraunces', serif;
+  font-size: 1.3rem;
+  margin-bottom: 0.3rem;
+}
+.sales-summary div span {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
 .orders {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
