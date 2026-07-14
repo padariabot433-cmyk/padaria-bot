@@ -7,7 +7,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import makeWASocket, { DisconnectReason, fetchLatestBaileysVersion } from '@whiskeysockets/baileys';
 
-import { connectDB, Order } from './src/db.js';
+import { connectDB, Order, Customer } from './src/db.js';
 import { useMongoAuthState } from './src/authState.js';
 import { handleMessage } from './src/orderFlow.js';
 import { adminAuth } from './src/adminAuth.js';
@@ -164,6 +164,22 @@ app.patch('/api/orders/:id', adminAuth, async (req, res) => {
 
     Object.assign(order, updates);
     await order.save();
+
+    // Se o número (JID) do pedido foi corrigido no painel, propaga essa
+    // correção para o cadastro do cliente — assim o bot passa a reconhecer
+    // esse número da próxima vez (repetir pedido, cache de nome, etc).
+    if (updates.customerJid) {
+      await Customer.findOneAndUpdate(
+        { jid: updates.customerJid },
+        {
+          jid: updates.customerJid,
+          name: order.customerName || undefined,
+          updatedAt: new Date(),
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      );
+    }
+
     res.json(order);
   } catch (error) {
     console.error('Erro ao editar pedido:', error);
