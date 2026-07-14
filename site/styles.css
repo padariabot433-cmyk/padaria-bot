@@ -980,9 +980,7 @@ button:hover { opacity: 0.92; }
 
 /* Action bar docked at the top, above the summary cards (sticky while scrolling) */
 .floating-bar {
-  position: sticky;
-  top: 0;
-  z-index: 60;
+  position: static;
   width: 100%;
   background: var(--card);
   border-radius: 14px;
