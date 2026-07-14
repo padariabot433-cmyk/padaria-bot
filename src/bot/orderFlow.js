@@ -93,7 +93,47 @@ async function notifyAdminOfFailure(sock, failedJid, err) {
 async function reply(sock, jid, text) {
   try {
     debugLog(`📤 Tentando enviar mensagem para ${jid}...`);
-    const result = await sock.sendMessage(jid, { text });
+
+    // Small message variation to reduce repetitive responses
+    function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+    // configurable delay (ms) between replies to avoid too-fast replies
+    const MIN_DELAY = Number(process.env.RESPONSE_MIN_DELAY_MS) || 700;
+    const MAX_DELAY = Number(process.env.RESPONSE_MAX_DELAY_MS) || 1600;
+    const delay = Math.floor(Math.random() * (MAX_DELAY - MIN_DELAY + 1)) + MIN_DELAY;
+
+    // Specific templates for common messages
+    let out = String(text || '');
+    if (out.includes('Pedido confirmado') || out.startsWith('🎉')) {
+      out = pick([
+        out.replace('🎉 Pedido confirmado!', '🎉 Pedido confirmado!'),
+        out.replace('🎉 Pedido confirmado!', '✅ Pedido recebido!'),
+        out.replace('🎉 Pedido confirmado!', '🙏 Pedido confirmado!')
+      ]);
+    } else if (out.includes('Pedido cancelado')) {
+      out = pick([
+        'Pedido cancelado. Quando quiser, é só me chamar novamente.',
+        'Tudo bem, pedido cancelado. Se quiser pedir depois, estou aqui!',
+        'Cancelado — sem problema. Posso ajudar em outra coisa?'
+      ]);
+    } else if (/não entendi|nao entendi/i.test(out)) {
+      out = pick([
+        'Desculpa, não entendi — pode digitar o número do item do cardápio?',
+        'Hmm, não peguei dessa vez. Digite o número do item que você quer.',
+        'Não entendi direito 🤔. Tente digitar apenas o número do item.'
+      ]);
+    } else {
+      // generic small prefix variations
+      const prefixes = ['', 'Oi! ', 'Olá! ', 'Tudo bem? ', 'Beleza? '];
+      if (Math.random() < 0.45) {
+        out = pick(prefixes) + out;
+      }
+    }
+
+    // wait a random short delay before actually sending
+    await new Promise((resolve) => setTimeout(resolve, delay));
+
+    const result = await sock.sendMessage(jid, { text: out });
     debugLog(`✅ sendMessage retornou OK para ${jid} (id da msg: ${result?.key?.id || 'sem id'})`);
   } catch (err) {
     console.error(`❌ sendMessage FALHOU para ${jid}:`, err);
