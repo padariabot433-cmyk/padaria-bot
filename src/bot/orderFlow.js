@@ -96,39 +96,79 @@ async function reply(sock, jid, text) {
 
     // Small message variation to reduce repetitive responses
     function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+    function expand(template, base) { return template.replace('{base}', base); }
 
     // configurable delay (ms) between replies to avoid too-fast replies
     const MIN_DELAY = Number(process.env.RESPONSE_MIN_DELAY_MS) || 700;
     const MAX_DELAY = Number(process.env.RESPONSE_MAX_DELAY_MS) || 1600;
     const delay = Math.floor(Math.random() * (MAX_DELAY - MIN_DELAY + 1)) + MIN_DELAY;
 
-    // Specific templates for common messages
     let out = String(text || '');
-    if (out.includes('Pedido confirmado') || out.startsWith('🎉')) {
-      out = pick([
-        out.replace('🎉 Pedido confirmado!', '🎉 Pedido confirmado!'),
-        out.replace('🎉 Pedido confirmado!', '✅ Pedido recebido!'),
-        out.replace('🎉 Pedido confirmado!', '🙏 Pedido confirmado!')
-      ]);
-    } else if (out.includes('Pedido cancelado')) {
-      out = pick([
-        'Pedido cancelado. Quando quiser, é só me chamar novamente.',
-        'Tudo bem, pedido cancelado. Se quiser pedir depois, estou aqui!',
-        'Cancelado — sem problema. Posso ajudar em outra coisa?'
-      ]);
-    } else if (/não entendi|nao entendi/i.test(out)) {
-      out = pick([
-        'Desculpa, não entendi — pode digitar o número do item do cardápio?',
-        'Hmm, não peguei dessa vez. Digite o número do item que você quer.',
-        'Não entendi direito 🤔. Tente digitar apenas o número do item.'
-      ]);
+
+    // richer template pools for common categories
+    const confirmTemplates = [
+      '{base}',
+      '🎉 {base}',
+      '✅ {base}',
+      'Obrigado! {base}',
+      'Perfeito — {base}',
+      'Show! {base}',
+      'Ótimo, seu pedido foi registrado. {base}',
+      'Anotado 😊 {base}',
+      'Pedido confirmado — já estamos preparando. {base}',
+      'Recebido! {base}'
+    ];
+
+    const cancelTemplates = [
+      '{base}',
+      'Pedido cancelado. Se precisar, é só chamar.',
+      'Feito — cancelado. Quer algo mais?',
+      'Ok, pedido cancelado. Estou por aqui se mudar de ideia.',
+      'Cancelado ✅. Se quiser pedir de novo, digite qualquer coisa.'
+    ];
+
+    const notUnderstandTemplates = [
+      'Desculpa, não entendi — pode digitar só o número do item?',
+      'Não peguei dessa vez. Digite o número do item que você quer (ex: 3).',
+      'Hmm, não entendi 🤔. Tente enviar apenas o número do item.',
+      'Pode repetir em números? Ex: 1,2 ou 3',
+      'Ops — não entendi. Digite apenas o(s) número(s) do cardápio.'
+    ];
+
+    const genericPrefixes = ['', 'Oi! ', 'Olá! ', 'Beleza? ', 'Tudo bem? ', 'Ei! '];
+
+    // handle different known message patterns
+    if (out.match(/pedido confirmado|🎉|Pedido confirmado/i)) {
+      out = expand(pick(confirmTemplates), out);
+    } else if (out.match(/pedido cancelado|Pedido cancelado/i)) {
+      out = pick(cancelTemplates);
+    } else if (out.match(/não entendi|nao entendi|não peguei|não entendi direito/i)) {
+      out = pick(notUnderstandTemplates);
+    } else if (/^Quantos pacotes de/i.test(out) || /quantos pacotes de/i.test(out)) {
+      // small variety for quantity prompts
+      const qtyTemplates = [
+        out,
+        out + ' (ex: 2)',
+        'Quantos você quer? ' + out,
+        'Diga quantos pacotes você quer de *{base}*'.replace('{base}', out.replace(/Quantos pacotes de\s*/i, ''))
+      ];
+      out = pick(qtyTemplates);
+    } else if (/Adicionado!|Removido:/.test(out)) {
+      const cartTemplates = [
+        out,
+        'Beleza! ' + out,
+        out + ' Quer adicionar mais alguma coisa?',
+        out + ' Se quiser finalizar, digite "fechar".'
+      ];
+      out = pick(cartTemplates);
     } else {
-      // generic small prefix variations
-      const prefixes = ['', 'Oi! ', 'Olá! ', 'Tudo bem? ', 'Beleza? '];
-      if (Math.random() < 0.45) {
-        out = pick(prefixes) + out;
-      }
+      if (Math.random() < 0.55) out = pick(genericPrefixes) + out;
     }
+
+    // minor random suffixes to further vary short messages
+    const suffixChance = Math.random();
+    if (suffixChance < 0.12) out = out + ' 👍';
+    else if (suffixChance < 0.22) out = out + ' 😊';
 
     // wait a random short delay before actually sending
     await new Promise((resolve) => setTimeout(resolve, delay));
