@@ -45,6 +45,22 @@ app.use(express.json());
 // com os headers certos independentemente de senha/autenticação.
 const ALLOWED_ORIGIN = process.env.SITE_ORIGIN || 'https://padariabot433-cmyk.github.io';
 
+// Normaliza entradas de telefone/JID vindas do painel.
+// Aceita formatos como "556599999999" ou "556599999999@s.whatsapp.net" e
+// retorna o JID completo usado internamente pelo sistema.
+function normalizeJid(value) {
+  if (!value) return '';
+  let v = String(value).trim();
+  // se já parece um JID completo, retorna como está
+  if (v.includes('@')) return v;
+  // remove tudo que não é dígito
+  const digits = v.replace(/\D/g, '');
+  if (!digits) return '';
+  // se o número já começa com 0/+, tenta remover prefixo zero
+  // (assumimos que o painel envia com DDI correto quando possível)
+  return `${digits}@s.whatsapp.net`;
+}
+
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', ALLOWED_ORIGIN);
   res.header('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
@@ -155,7 +171,9 @@ app.get('/api/orders', adminAuth, async (req, res) => {
 // pessoalmente no balcão), sem precisar passar pelo fluxo do WhatsApp.
 app.post('/api/orders', adminAuth, async (req, res) => {
   try {
-    const { customerName, customerJid, items, status, valorPago } = req.body;
+    const { customerName, customerJid: rawCustomerJid, items, status, valorPago } = req.body;
+
+    const customerJid = normalizeJid(rawCustomerJid);
 
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'Inclua ao menos um item no pedido.' });
@@ -200,6 +218,11 @@ app.patch('/api/orders/:id', adminAuth, async (req, res) => {
       if (req.body[key] !== undefined) {
         updates[key] = req.body[key];
       }
+    }
+
+    // normalize customer JID if present in the payload
+    if (updates.customerJid) {
+      updates.customerJid = normalizeJid(updates.customerJid);
     }
 
     if (updates.status && !['pendente', 'devendo', 'ok', 'confirmado', 'entregue', 'cancelado'].includes(updates.status)) {
