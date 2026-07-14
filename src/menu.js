@@ -1,6 +1,9 @@
-// Edite esta lista para mudar os produtos, preços e unidades do seu pai.
-// "id" é o número que o cliente vai digitar no WhatsApp para escolher o item.
-export const MENU = [
+import { MenuItem } from './db.js';
+
+// Cardápio inicial — usado só pra popular o banco na primeira vez que o bot
+// rodar (se a coleção "menu_items" estiver vazia). Depois disso, o cardápio
+// é editado pelo painel (/site) e vive no MongoDB.
+const DEFAULT_MENU = [
   { id: 1, name: 'Pão Francês (pacote)', price: 0.75 },
   { id: 2, name: 'Pão de Forma (pacote)', price: 8.5 },
   { id: 3, name: 'Pão Doce (pacote)', price: 3.5 },
@@ -8,22 +11,55 @@ export const MENU = [
   { id: 5, name: 'Rosca de Canela (pacote)', price: 12.0 },
 ];
 
+// Cache curtinho pra não bater no banco a cada mensagem do WhatsApp.
+// É invalidado na hora quando o painel salva uma mudança (veja menuRoutes.js).
+let cachedMenu = null;
+let cachedAt = 0;
+const CACHE_TTL_MS = 30_000;
+
+export function invalidateMenuCache() {
+  cachedMenu = null;
+  cachedAt = 0;
+}
+
+export async function getMenu() {
+  const now = Date.now();
+  if (cachedMenu && now - cachedAt < CACHE_TTL_MS) {
+    return cachedMenu;
+  }
+
+  let items = await MenuItem.find({ active: true }).sort({ id: 1 }).lean();
+
+  if (items.length === 0) {
+    const existingCount = await MenuItem.countDocuments();
+    if (existingCount === 0) {
+      await MenuItem.insertMany(DEFAULT_MENU.map((item) => ({ ...item, active: true })));
+      items = await MenuItem.find({ active: true }).sort({ id: 1 }).lean();
+    }
+  }
+
+  cachedMenu = items;
+  cachedAt = now;
+  return items;
+}
+
 export function formatMoney(value) {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-export function buildMenuText() {
-  const lines = MENU.map(
+export function buildMenuTextFromList(menu) {
+  const lines = menu.map(
     (item) => `${item.id}. ${item.name} - ${formatMoney(item.price)}`
   );
   return (
     '🥖 *Cardápio*\n\n' +
     lines.join('\n') +
     '\n\nDigite o *número* do item que deseja (ex: "1").\n' +
-    'Para pedir mais de um item, digite os números separados por vírgula (ex: "1,3").'
+    'Para pedir mais de um item, digite os números separados por vírgula (ex: "1,3").\n\n' +
+    '_A qualquer momento, digite *cancelar* para interromper o pedido._'
   );
 }
 
-export function findItem(id) {
-  return MENU.find((item) => item.id === id);
+export function findItemInMenu(menu, id) {
+  return menu.find((item) => item.id === id);
 }

@@ -25,7 +25,6 @@ const orderSchema = new mongoose.Schema({
   customerName: String,
   items: [orderItemSchema],
   total: Number,
-  address: String,
   status: {
     type: String,
     enum: ['pendente', 'devendo', 'ok', 'confirmado', 'entregue', 'cancelado'],
@@ -36,10 +35,21 @@ const orderSchema = new mongoose.Schema({
 
 export const Order = mongoose.model('Order', orderSchema);
 
+const menuItemSchema = new mongoose.Schema(
+  {
+    id: { type: Number, required: true, unique: true },
+    name: { type: String, required: true },
+    price: { type: Number, required: true },
+    active: { type: Boolean, default: true },
+  },
+  { collection: 'menu_items' }
+);
+
+export const MenuItem = mongoose.model('MenuItem', menuItemSchema);
+
 const customerSchema = new mongoose.Schema({
   jid: { type: String, required: true, unique: true },
   name: String,
-  address: String,
   updatedAt: { type: Date, default: Date.now },
 });
 
@@ -55,10 +65,10 @@ const sessionSchema = new mongoose.Schema(
     jid: { type: String, required: true, unique: true },
     step: { type: String, default: 'inicio' },
     cart: [orderItemSchema],
-    address: String,
     customerName: String,
     pendingItems: [pendingItemSchema],
     pendingIndex: Number,
+    lastOrderCart: [orderItemSchema],
     updatedAt: { type: Date, default: Date.now },
   },
   { collection: 'whatsapp_sessions' }

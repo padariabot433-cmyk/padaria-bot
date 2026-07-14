@@ -11,7 +11,7 @@ import { connectDB, Order } from './src/db.js';
 import { useMongoAuthState } from './src/authState.js';
 import { handleMessage } from './src/orderFlow.js';
 import { adminAuth } from './src/adminAuth.js';
-import { adminRouter } from './src/adminRoutes.js';
+import { menuRouter } from './src/menuRoutes.js';
 import { startDailyReminder } from './src/dailyReminder.js';
 import { startWeeklyBackup } from './src/backup.js';
 import { createBotInstanceId, acquireBotLock, refreshBotLock, releaseBotLock } from './src/botLock.js';
@@ -19,6 +19,13 @@ import { createBotInstanceId, acquireBotLock, refreshBotLock, releaseBotLock } f
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
 const app = express();
+
+// Logs de diagnóstico (mensagem recebida, JID @lid, etc). Fica desligado em
+// produção por padrão — ligue com DEBUG_LOGS=true no Render se precisar investigar algo.
+const DEBUG_LOGS = process.env.DEBUG_LOGS === 'true';
+function debugLog(...args) {
+  if (DEBUG_LOGS) console.log(...args);
+}
 
 // Só avisa no log — não bloqueia o app, mas ajuda a evitar senha fácil de adivinhar
 function checkPasswordStrength(password) {
@@ -54,22 +61,48 @@ const botInstanceId = createBotInstanceId();
 let botLockRefresh = null;
 let hasBotLock = false;
 
+// Contadores simples pra monitorar o bug do @lid sem precisar de logs de debug ligados.
+// Zeram a cada restart do serviço (é só um pulso de "isso ainda tá acontecendo?").
+const stats = {
+  startedAt: new Date(),
+  lidContacts: 0,
+  messagesReceived: 0,
+};
+
+// Backoff crescente pra reconexão: evita martelar o WhatsApp se a conexão
+// cair várias vezes seguidas. Zera assim que a conexão fica estável de novo.
+let reconnectAttempts = 0;
+const BASE_RECONNECT_DELAY_MS = 3000;
+const MAX_RECONNECT_DELAY_MS = 60000;
+
 // Serve a página de redirecionamento (index.html da raiz)
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 // Serve o painel (header.html, controls.html, summary.html, index.html)
-// protegido pela mesma senha do /pedidos
+// protegido pela mesma senha
 app.use('/site', adminAuth, express.static(path.join(__dirname, 'site')));
 
 // Status simples do bot
 app.get('/status', (req, res) => {
-  res.send(`Bot da padaria está no ar. Status da conexão: ${connectionStatus}`);
+  const uptimeMin = Math.floor((Date.now() - stats.startedAt.getTime()) / 60000);
+  res.send(
+    `Bot da padaria está no ar. Status da conexão: ${connectionStatus}\n\n` +
+      `Desde o último restart (${uptimeMin} min atrás):\n` +
+      `Mensagens recebidas: ${stats.messagesReceived}\n` +
+      `Contatos via @lid: ${stats.lidContacts}`
+  );
 });
 
-// Painel de pedidos, protegido por senha (ADMIN_PASSWORD no .env)
-app.use('/pedidos', adminAuth, adminRouter);
+// O painel antigo (/pedidos) foi aposentado — quem tiver o link salvo
+// é redirecionado automaticamente pro painel atual em /site.
+app.get('/pedidos', (req, res) => {
+  res.redirect('/site/index.html');
+});
+
+// API do cardápio, usada pelo editor dentro do painel (/site)
+app.use('/api/menu', adminAuth, menuRouter);
 
 app.get('/api/orders', adminAuth, async (req, res) => {
   try {
@@ -261,10 +294,14 @@ async function startBot() {
         return;
       }
 
-      setTimeout(() => startBot(), 3000);
+      const delay = Math.min(BASE_RECONNECT_DELAY_MS * 2 ** reconnectAttempts, MAX_RECONNECT_DELAY_MS);
+      reconnectAttempts += 1;
+      console.log(`⏳ Tentando reconectar em ${delay / 1000}s (tentativa ${reconnectAttempts})...`);
+      setTimeout(() => startBot(), delay);
     } else if (connection === 'open') {
       connectionStatus = 'conectado';
       latestQR = null;
+      reconnectAttempts = 0;
       console.log('✅ WhatsApp conectado com sucesso!');
 
       if (!reminderStarted) {
@@ -276,21 +313,21 @@ async function startBot() {
   });
 
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
-    console.log(`📩 messages.upsert disparado. type: ${type}, quantidade: ${messages.length}`);
+    debugLog(`📩 messages.upsert disparado. type: ${type}, quantidade: ${messages.length}`);
 
     if (type !== 'notify') return;
 
     for (const msg of messages) {
-      console.log(`   → mensagem de ${msg.key.remoteJid}, fromMe: ${msg.key.fromMe}, tem conteúdo: ${!!msg.message}`);
+      debugLog(`   → mensagem de ${msg.key.remoteJid}, fromMe: ${msg.key.fromMe}, tem conteúdo: ${!!msg.message}`);
 
       if (!msg.message || msg.key.fromMe) {
-        console.log('   → ignorada (sem conteúdo ou é mensagem própria)');
+        debugLog('   → ignorada (sem conteúdo ou é mensagem própria)');
         continue;
       }
 
       const jid = msg.key.remoteJid;
       if (jid === 'status@broadcast' || jid.endsWith('@g.us')) {
-        console.log('   → ignorada (status ou grupo)');
+        debugLog('   → ignorada (status ou grupo)');
         continue;
       }
 
@@ -298,11 +335,13 @@ async function startBot() {
       // traz o telefone real nesse campo alternativo. Usamos ele só pra exibir/
       // salvar o contato — a resposta continua indo pro "jid" original (@lid).
       const realPhoneJid = msg.key.remoteJidAlt || jid;
+      stats.messagesReceived += 1;
 
       if (realPhoneJid !== jid) {
-        console.log(`ℹ️ Contato veio como @lid (${jid}), telefone real encontrado: ${realPhoneJid}`);
+        stats.lidContacts += 1;
+        debugLog(`ℹ️ Contato veio como @lid (${jid}), telefone real encontrado: ${realPhoneJid}`);
       } else {
-        console.log(`ℹ️ Contato sem telefone real disponível, vamos responder pelo @lid mesmo: ${jid}`);
+        debugLog(`ℹ️ Contato sem telefone real disponível, vamos responder pelo @lid mesmo: ${jid}`);
       }
 
       const text =

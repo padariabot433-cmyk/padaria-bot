@@ -1,4 +1,4 @@
-import { MENU, findItem, buildMenuText, formatMoney } from './menu.js';
+import { getMenu, findItemInMenu, buildMenuTextFromList, formatMoney } from './menu.js';
 import { Order, Session, Customer } from './db.js';
 
 function cartTotal(cart) {
@@ -13,16 +13,28 @@ function cartSummaryText(cart) {
   return lines.join('\n') + `\n\n*Total: ${formatMoney(cartTotal(cart))}*`;
 }
 
+function cartSummaryTextNumbered(cart) {
+  const lines = cart.map(
+    (item, i) =>
+      `${i + 1}. ${item.quantity}x ${item.name} - ${formatMoney(item.price * item.quantity)}`
+  );
+  return lines.join('\n') + `\n\n*Total: ${formatMoney(cartTotal(cart))}*`;
+}
+
 // Sessão agora vive no MongoDB — sobrevive a reinícios do bot
 async function getCustomer(jid) {
   return Customer.findOne({ jid });
 }
 
-async function upsertCustomer({ jid, name, address }) {
+async function getLastOrder(jid) {
+  return Order.findOne({ customerJid: jid, status: { $ne: 'cancelado' } }).sort({ createdAt: -1 });
+}
+
+async function upsertCustomer({ jid, name }) {
   if (!jid) return null;
   return Customer.findOneAndUpdate(
     { jid },
-    { name, address, updatedAt: new Date() },
+    { name, updatedAt: new Date() },
     { upsert: true, new: true }
   );
 }
@@ -30,14 +42,13 @@ async function upsertCustomer({ jid, name, address }) {
 async function getSession(jid) {
   let session = await Session.findOne({ jid });
   if (!session) {
-    session = await Session.create({ jid, step: 'inicio', cart: [], address: null, customerName: '' });
+    session = await Session.create({ jid, step: 'inicio', cart: [], customerName: '' });
   }
 
-  if (!session.address) {
+  if (!session.customerName) {
     const customer = await getCustomer(jid);
-    if (customer) {
-      if (customer.address) session.address = customer.address;
-      if (customer.name) session.customerName = customer.name;
+    if (customer?.name) {
+      session.customerName = customer.name;
       await saveSession(session);
     }
   }
@@ -54,21 +65,74 @@ async function saveSession(session) {
   await session.save();
 }
 
+const DEBUG_LOGS = process.env.DEBUG_LOGS === 'true';
+function debugLog(...args) {
+  if (DEBUG_LOGS) console.log(...args);
+}
+
+async function notifyAdminOfFailure(sock, failedJid, err) {
+  const admin = process.env.ADMIN_NUMBER;
+  if (!admin) return;
+
+  const adminJid = admin.includes('@') ? admin : `${admin}@s.whatsapp.net`;
+  if (adminJid === failedJid) return; // evita loop se a falha for ao tentar avisar o próprio admin
+
+  try {
+    await sock.sendMessage(adminJid, {
+      text:
+        `⚠️ *Falha ao enviar mensagem para um cliente*\n\n` +
+        `JID: ${failedJid}\n` +
+        `Erro: ${err?.message || 'desconhecido'}\n\n` +
+        `Pode ser o bug conhecido do @lid — o cliente pode não ter recebido a resposta do bot.`,
+    });
+  } catch (notifyErr) {
+    console.error('Também falhou ao avisar o admin sobre a falha de envio:', notifyErr);
+  }
+}
+
 async function reply(sock, jid, text) {
   try {
-    console.log(`📤 Tentando enviar mensagem para ${jid}...`);
+    debugLog(`📤 Tentando enviar mensagem para ${jid}...`);
     const result = await sock.sendMessage(jid, { text });
-    console.log(`✅ sendMessage retornou OK para ${jid} (id da msg: ${result?.key?.id || 'sem id'})`);
+    debugLog(`✅ sendMessage retornou OK para ${jid} (id da msg: ${result?.key?.id || 'sem id'})`);
   } catch (err) {
     console.error(`❌ sendMessage FALHOU para ${jid}:`, err);
+    await notifyAdminOfFailure(sock, jid, err);
     throw err;
   }
 }
 
+// Trava simples por cliente: evita que duas mensagens quase simultâneas do
+// mesmo número sejam processadas em paralelo (o que poderia gerar dois
+// pedidos duplicados se o cliente apertar "1" duas vezes muito rápido).
+const processingLocks = new Map();
+
+async function withLock(jid, fn) {
+  const previous = processingLocks.get(jid) || Promise.resolve();
+  let release;
+  const current = previous.then(() => new Promise((resolve) => { release = resolve; }));
+  processingLocks.set(jid, current.catch(() => {}));
+
+  await previous;
+  try {
+    return await fn();
+  } finally {
+    release();
+    if (processingLocks.get(jid) === current.catch(() => {})) {
+      processingLocks.delete(jid);
+    }
+  }
+}
+
 export async function handleMessage(sock, jid, rawText, pushName, realPhoneJid) {
+  return withLock(jid, () => handleMessageInner(sock, jid, rawText, pushName, realPhoneJid));
+}
+
+async function handleMessageInner(sock, jid, rawText, pushName, realPhoneJid) {
   const text = (rawText || '').trim();
   const lower = text.toLowerCase();
   const session = await getSession(jid);
+  const menu = await getMenu();
 
   // Responder pro telefone real (quando disponível) é mais confiável do que
   // responder pro @lid — o Baileys tem um bug conhecido onde mensagens
@@ -83,13 +147,65 @@ export async function handleMessage(sock, jid, rawText, pushName, realPhoneJid) 
 
   switch (session.step) {
     case 'inicio': {
-      session.step = 'menu';
-      await saveSession(session);
-      await reply(
-        sock,
-        jid,
-        `Olá${pushName ? ', ' + pushName : ''}! 👋 Bem-vindo(a) à Padaria.\n\n${buildMenuText()}`
-      );
+      const lookupJid = realPhoneJid || jid;
+      const customer = await getCustomer(lookupJid);
+      const lastOrder = customer ? await getLastOrder(lookupJid) : null;
+
+      if (customer?.name && lastOrder) {
+        session.step = 'repetir_pedido';
+        session.pendingItems = lastOrder.items.map((item) => ({
+          id: item.productId,
+          name: item.name,
+          price: item.price,
+        }));
+        session.lastOrderCart = lastOrder.items;
+        await saveSession(session);
+
+        await reply(
+          sock,
+          jid,
+          `Que bom te ver de novo, ${customer.name}! 👋\n\n` +
+            `Seu último pedido foi:\n${cartSummaryText(lastOrder.items)}\n\n` +
+            'Digite *1* para repetir esse pedido, ou *2* para ver o cardápio e montar um pedido novo.'
+        );
+      } else {
+        session.step = 'menu';
+        await saveSession(session);
+        await reply(
+          sock,
+          jid,
+          `Olá${pushName ? ', ' + pushName : ''}! 👋 Bem-vindo(a) à Padaria.\n\n${buildMenuTextFromList(menu)}`
+        );
+      }
+      break;
+    }
+
+    case 'repetir_pedido': {
+      if (lower === '1') {
+        session.cart = session.lastOrderCart.map((item) => ({
+          productId: item.productId,
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity,
+        }));
+        session.lastOrderCart = undefined;
+        session.pendingItems = [];
+        session.step = 'confirmacao';
+        await saveSession(session);
+        await reply(
+          sock,
+          jid,
+          `*Confirme seu pedido:*\n\n${cartSummaryText(session.cart)}\n\nDigite *1* para confirmar ou *2* para cancelar.`
+        );
+      } else if (lower === '2') {
+        session.lastOrderCart = undefined;
+        session.pendingItems = [];
+        session.step = 'menu';
+        await saveSession(session);
+        await reply(sock, jid, buildMenuTextFromList(menu));
+      } else {
+        await reply(sock, jid, 'Digite *1* para repetir o último pedido, ou *2* para ver o cardápio.');
+      }
       break;
     }
 
@@ -99,16 +215,35 @@ export async function handleMessage(sock, jid, rawText, pushName, realPhoneJid) 
         .map((s) => parseInt(s.trim(), 10))
         .filter((n) => !Number.isNaN(n));
 
-      const validItems = ids.map(findItem).filter(Boolean);
+      if (ids.length === 0) {
+        await reply(
+          sock,
+          jid,
+          'Não entendi 🤔. Digite o número de um ou mais itens do cardápio, separados por vírgula.\n\n' +
+            buildMenuTextFromList(menu)
+        );
+        return;
+      }
+
+      const validItems = ids.map((id) => findItemInMenu(menu, id)).filter(Boolean);
+      const invalidIds = ids.filter((id) => !findItemInMenu(menu, id));
 
       if (validItems.length === 0) {
         await reply(
           sock,
           jid,
-          'Não entendi 🤔. Digite o número de um ou mais itens do cardápio, separados por vírgula.\n\n' +
-            buildMenuText()
+          `O número *${invalidIds.join(', ')}* não existe no cardápio 🤔. Digite um dos números abaixo:\n\n` +
+            buildMenuTextFromList(menu)
         );
         return;
+      }
+
+      if (invalidIds.length > 0) {
+        await reply(
+          sock,
+          jid,
+          `⚠️ O(s) número(s) *${invalidIds.join(', ')}* não existe(m) no cardápio e foi(ram) ignorado(s). Vamos continuar com os itens válidos que você escolheu.`
+        );
       }
 
       session.pendingItems = validItems;
@@ -147,7 +282,8 @@ export async function handleMessage(sock, jid, rawText, pushName, realPhoneJid) 
           sock,
           jid,
           `Adicionado! ✅\n\n${cartSummaryText(session.cart)}\n\n` +
-            'Deseja adicionar mais itens? Digite o número do item, ou digite *"fechar"* para finalizar o pedido.'
+            'Deseja adicionar mais itens? Digite o número do item, digite *"remover"* pra tirar algo do carrinho, ou digite *"fechar"* para finalizar o pedido.\n\n' +
+            '_Ou digite *cancelar* para interromper._'
         );
       }
       break;
@@ -159,9 +295,61 @@ export async function handleMessage(sock, jid, rawText, pushName, realPhoneJid) 
           await reply(sock, jid, 'Seu carrinho está vazio. Digite um número do cardápio primeiro.');
           return;
         }
-        session.step = 'endereco';
+        session.step = 'confirmacao';
         await saveSession(session);
-        await reply(sock, jid, 'Perfeito! Agora me diga o *endereço de entrega* completo.');
+        await reply(
+          sock,
+          jid,
+          `*Confirme seu pedido:*
+
+${cartSummaryText(session.cart)}
+
+Digite *1* para confirmar ou *2* para cancelar.`
+        );
+        return;
+      }
+
+      if (lower === 'remover') {
+        await reply(
+          sock,
+          jid,
+          `Seu carrinho:\n\n${cartSummaryTextNumbered(session.cart)}\n\n` +
+            'Digite *"remover"* seguido do número do item pra tirá-lo (ex: "remover 2").'
+        );
+        return;
+      }
+
+      const removeMatch = lower.match(/^remover\s+(\d+)$/);
+      if (removeMatch) {
+        const index = parseInt(removeMatch[1], 10) - 1;
+
+        if (index < 0 || index >= session.cart.length) {
+          await reply(
+            sock,
+            jid,
+            `Não achei o item *${removeMatch[1]}* no seu carrinho 🤔.\n\n${cartSummaryTextNumbered(session.cart)}`
+          );
+          return;
+        }
+
+        const removed = session.cart[index];
+        session.cart.splice(index, 1);
+        await saveSession(session);
+
+        if (session.cart.length === 0) {
+          await reply(
+            sock,
+            jid,
+            `Removido: ${removed.quantity}x ${removed.name} ✅\n\nSeu carrinho ficou vazio. Digite o número de um item do cardápio para adicionar.`
+          );
+        } else {
+          await reply(
+            sock,
+            jid,
+            `Removido: ${removed.quantity}x ${removed.name} ✅\n\n${cartSummaryText(session.cart)}\n\n` +
+              'Deseja adicionar mais itens, remover outro (*"remover"*), ou digitar *"fechar"* para finalizar.'
+          );
+        }
         return;
       }
 
@@ -169,15 +357,26 @@ export async function handleMessage(sock, jid, rawText, pushName, realPhoneJid) 
         .split(',')
         .map((s) => parseInt(s.trim(), 10))
         .filter((n) => !Number.isNaN(n));
-      const validItems = ids.map(findItem).filter(Boolean);
+      const validItems = ids.map((id) => findItemInMenu(menu, id)).filter(Boolean);
+      const invalidIds = ids.filter((id) => !findItemInMenu(menu, id));
 
       if (validItems.length === 0) {
         await reply(
           sock,
           jid,
-          'Digite o número de um item do cardápio para adicionar, ou *"fechar"* para finalizar.'
+          ids.length > 0
+            ? `O número *${invalidIds.join(', ')}* não existe no cardápio 🤔. Digite um item válido, ou *"fechar"* para finalizar.`
+            : 'Digite o número de um item do cardápio para adicionar, ou *"fechar"* para finalizar.'
         );
         return;
+      }
+
+      if (invalidIds.length > 0) {
+        await reply(
+          sock,
+          jid,
+          `⚠️ O(s) número(s) *${invalidIds.join(', ')}* não existe(m) no cardápio e foi(ram) ignorado(s).`
+        );
       }
 
       session.pendingItems = validItems;
@@ -185,25 +384,6 @@ export async function handleMessage(sock, jid, rawText, pushName, realPhoneJid) 
       session.step = 'quantidade';
       await saveSession(session);
       await reply(sock, jid, `Quantos pacotes de *${validItems[0].name}* você quer?`);
-      break;
-    }
-
-    case 'endereco': {
-      if (!session.customerName && pushName) {
-        session.customerName = pushName;
-      }
-      if (text.toLowerCase() !== 'mesmo' || !session.address) {
-        session.address = text;
-      }
-      session.step = 'confirmacao';
-      await saveSession(session);
-      await reply(
-        sock,
-        jid,
-        `*Confirme seu pedido:*\n\n${cartSummaryText(session.cart)}\n\n` +
-          `📍 Endereço: ${session.address}\n\n` +
-          'Digite *1* para confirmar ou *2* para cancelar. Se quiser alterar o endereço, digite-o novamente.'
-      );
       break;
     }
 
@@ -219,14 +399,12 @@ export async function handleMessage(sock, jid, rawText, pushName, realPhoneJid) 
           customerName: session.customerName || pushName || '',
           items: session.cart,
           total: cartTotal(session.cart),
-          address: session.address,
           status: 'pendente',
         });
 
         const customer = await upsertCustomer({
           jid: customerJid,
           name: session.customerName || pushName || '',
-          address: session.address,
         });
 
         await reply(
@@ -242,7 +420,7 @@ export async function handleMessage(sock, jid, rawText, pushName, realPhoneJid) 
           await reply(
             sock,
             adminJid,
-            `🆕 *Novo pedido!*\n\n${cartSummaryText(session.cart)}\n\n📍 ${session.address}\n📱 Cliente: ${customerJid.split('@')[0]}`
+            `🆕 *Novo pedido!*\n\n${cartSummaryText(session.cart)}\n\n Cliente: ${customerJid.split('@')[0]}`
           );
         }
 
