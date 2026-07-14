@@ -1,11 +1,12 @@
 import express from 'express';
 import { MenuItem } from './db.js';
-import { invalidateMenuCache } from './menu.js';
+import { invalidateMenuCache, ensureMenuSeeded } from './menu.js';
 
 export const menuRouter = express.Router();
 
 menuRouter.get('/', async (req, res) => {
   try {
+    await ensureMenuSeeded();
     const items = await MenuItem.find().sort({ id: 1 });
     res.json(items);
   } catch (error) {

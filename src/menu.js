@@ -22,21 +22,21 @@ export function invalidateMenuCache() {
   cachedAt = 0;
 }
 
+export async function ensureMenuSeeded() {
+  const existingCount = await MenuItem.countDocuments();
+  if (existingCount === 0) {
+    await MenuItem.insertMany(DEFAULT_MENU.map((item) => ({ ...item, active: true })));
+  }
+}
+
 export async function getMenu() {
   const now = Date.now();
   if (cachedMenu && now - cachedAt < CACHE_TTL_MS) {
     return cachedMenu;
   }
 
-  let items = await MenuItem.find({ active: true }).sort({ id: 1 }).lean();
-
-  if (items.length === 0) {
-    const existingCount = await MenuItem.countDocuments();
-    if (existingCount === 0) {
-      await MenuItem.insertMany(DEFAULT_MENU.map((item) => ({ ...item, active: true })));
-      items = await MenuItem.find({ active: true }).sort({ id: 1 }).lean();
-    }
-  }
+  await ensureMenuSeeded();
+  const items = await MenuItem.find({ active: true }).sort({ id: 1 }).lean();
 
   cachedMenu = items;
   cachedAt = now;
