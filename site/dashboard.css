@@ -5,8 +5,16 @@
 /* Dashboard-only tweaks */
 main { max-width: 1100px; }
 
-/* Ensure revenue chart has a visible height on load */
-#revenueChart { height: 180px; display: block; }
+/* Container que trava a altura do gráfico — sem isso o Chart.js entra
+   num loop de redimensionamento e o canvas cresce infinitamente. */
+.chart-container {
+  position: relative;
+  height: 260px;
+}
+.chart-container canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
 
 /* Slightly tighter summary cards on dashboard */
 .summary-card { padding: 0.9rem 1rem; }

@@ -69,8 +69,10 @@
         <p class="muted">Pedidos cancelados não entram nesses totais. "Esta semana" considera de segunda-feira até agora.</p>
 
         <section class="sales-summary-panel" aria-labelledby="revenueHeading">
-          <h3 id="revenueHeading" class="chart-title">Receita — Últimos 30 dias</h3>
-          <canvas id="revenueChart" height="120" aria-label="Gráfico de receita"></canvas>
+          <h3 id="revenueHeading" class="chart-title">Receita — período selecionado</h3>
+          <div class="chart-container">
+            <canvas id="revenueChart" aria-label="Gráfico de receita"></canvas>
+          </div>
         </section>
 
         <section id="itemsChartPanel" class="items-chart-panel" aria-labelledby="topItemsHeading">
